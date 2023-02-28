@@ -1,0 +1,18 @@
+[package]
+name = "seq_geom_xform"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "seq_geom_xform"
+path = "src/lib.rs"
+
+[[bin]]
+name = "seq_xformer"
+path = "src/bin/bin.rs"
+
+[dependencies]
+seq_geom_parser = { git = "https://github.com/COMBINE-lab/seq_geom_parser", version = "0.1.1" }
+regex = "1.7"
+anyhow = "1.0"
