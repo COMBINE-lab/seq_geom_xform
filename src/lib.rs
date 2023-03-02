@@ -18,7 +18,7 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> String {
     let mut rep = String::from("");
     match gp {
         GeomPiece::Discard(GeomLen::Bounded(x)) => {
-            rep += &format!("[ACGTNacgtn]{{{}}}", x);
+            rep += &format!(r#"[ACGTNacgtn]{{{}}}"#, x);
         }
         GeomPiece::Barcode(GeomLen::Bounded(x)) => {
             rep += &format!(r#"([ACGTNacgtn]{{{}}})"#, x);
