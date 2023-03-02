@@ -1,4 +1,4 @@
-use seq_geom_parser::{FragmentGeomDesc, GeomPiece, GeomLen};
+use seq_geom_parser::{FragmentGeomDesc, GeomPiece, GeomLen, NucStr};
 use regex;
 use anyhow::{Context, Result};
 
@@ -28,6 +28,11 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> String {
         }
         GeomPiece::ReadSeq(GeomLen::Bounded(x)) => {
             rep += &format!(r#"([ACGTNacgtn]{{{}}})"#, x);
+        }
+        GeomPiece::Fixed(NucStr::Seq(s)) => {
+            // no caputre group because no need to capture this
+            // right now
+            rep += &format!(r#"{}"#, s);
         }
         GeomPiece::Discard(GeomLen::Unbounded) => {
             rep += &format!(r#"[ACGTNacgtn]*"#);
