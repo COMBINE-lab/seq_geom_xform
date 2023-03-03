@@ -1,10 +1,8 @@
 use seq_geom_parser::FragmentGeomDesc;
 use seq_geom_xform::FragmentGeomDescExt;
 
-use needletail::{parse_fastx_file, FastxReader, Sequence};
+use needletail::{parse_fastx_file, Sequence};
 
-use regex::bytes::Regex;
-use std::env;
 
 fn main() {
     let gd = std::env::args().nth(1).unwrap();
@@ -29,17 +27,14 @@ fn main() {
             let seqrec2 = record2.expect("invalid record");
 
             if geo_re.parse_into(seqrec.sequence(), seqrec2.sequence(), &mut parsed_records) {
+                unsafe {
                 println!(
-                    "parsed (r1, r2) = ({}, {})",
-                    parsed_records.s1, parsed_records.s2
+                    ">{}\n{}\n>{}\n{}",
+                    std::str::from_utf8_unchecked(seqrec.id()), parsed_records.s1, 
+                    std::str::from_utf8_unchecked(seqrec2.id()), parsed_records.s2
                 );
+                }
             }
         }
     }
-
-    //let r = regex::Regex::new(r"^([ACGTNacgtn]{16})([ACGTNacgtn]{12})[ACGTNacgtn]*").unwrap();
-    //let s = "TGGTGGCCAGCGCCCCCTGCTGGCGCCGGGGCACTGCAGGGCCCTCTTGCTTACTGTATAGTGGTGGCACGCCGCCTGCTGGCAGCTAGGG";
-    //if let Some(cap) = r.captures(s) {
-    //println!("captures = {:?}", cap);
-    //}
 }

@@ -38,8 +38,18 @@ impl SeqPair {
     }
 }
 
-const VAR_LEN_BC_PADDING: &'static [&'static str] = &["A", "AC", "AAG", "AAAT"];
+impl Default for SeqPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
+const VAR_LEN_BC_PADDING: &[&str] = &["A", "AC", "AAG", "AAAT"];
+
+/// Builds the parsed output string `s` given the `CaptureLocations` `clocs`,
+/// the expected captured `GeomPiece`s `gpieces` and the input string `r`.  This function
+/// returns true if the parse was succesful (the captured groups are what is expected)
+/// and false otherwise.
 #[inline(always)]
 fn parse_single_read(
     clocs: &CaptureLocations,
@@ -80,21 +90,24 @@ fn parse_single_read(
 }
 
 impl FragmentRegexDesc {
-    /// returns true if the entire *pair* of reads was parsed succesfully, and false
-    /// otherwise
+    /// Parses the read pair `r1` and `r2` in accordance with the geometry specified 
+    /// in `self`.  The resulting parse, if successful, is placed into the output 
+    /// `sp`. This function returns true if the entire *pair* of reads was parsed succesfully, 
+    /// and false otherwise. If the parse is not successful, nothing can be assumed about 
+    /// the contents of `sp`.
     pub fn parse_into(&mut self, r1: &[u8], r2: &[u8], sp: &mut SeqPair) -> bool {
         sp.clear();
-        let m1 = self.r1_re.captures_read(&mut self.r1_clocs, r1);
-        let m2 = self.r2_re.captures_read(&mut self.r2_clocs, r2);
+        let _m1 = self.r1_re.captures_read(&mut self.r1_clocs, r1);
+        let _m2 = self.r2_re.captures_read(&mut self.r2_clocs, r2);
 
         let s1 = unsafe { std::str::from_utf8_unchecked(r1) };
         let s2 = unsafe { std::str::from_utf8_unchecked(r2) };
 
-        let parsed_r1 = parse_single_read(&self.r1_clocs, &self.r1_cginfo, &s1, &mut sp.s1);
+        let parsed_r1 = parse_single_read(&self.r1_clocs, &self.r1_cginfo, s1, &mut sp.s1);
         if parsed_r1 {
-            return parse_single_read(&self.r2_clocs, &self.r2_cginfo, &s2, &mut sp.s2);
+            parse_single_read(&self.r2_clocs, &self.r2_cginfo, s2, &mut sp.s2)
         } else {
-            return false;
+            false
         }
     }
 }
@@ -146,22 +159,22 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> (String, Option<GeomPiece>) {
         GeomPiece::Fixed(NucStr::Seq(s)) => {
             // no caputre group because no need to capture this
             // right now
-            rep += &format!(r#"{}"#, s);
+            rep += s;
         }
         // unbounded pieces
         GeomPiece::Discard(GeomLen::Unbounded) => {
-            rep += &format!(r#"[ACGTN]*"#);
+            rep += r#"[ACGTN]*"#;
         }
         GeomPiece::Barcode(GeomLen::Unbounded) => {
-            rep += &format!(r#"([ACGTN]*)"#);
+            rep += r#"([ACGTN]*)"#;
             geo = Some(gp.clone());
         }
         GeomPiece::Umi(GeomLen::Unbounded) => {
-            rep += &format!(r#"([ACGTN]*)"#);
+            rep += r#"([ACGTN]*)"#;
             geo = Some(gp.clone());
         }
         GeomPiece::ReadSeq(GeomLen::Unbounded) => {
-            rep += &format!(r#"([ACGTN]*)"#);
+            rep += r#"([ACGTN]*)"#;
             geo = Some(gp.clone());
         }
     }
