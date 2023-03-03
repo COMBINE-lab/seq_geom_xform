@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use regex::bytes::{CaptureLocations, Regex};
 use seq_geom_parser::{FragmentGeomDesc, GeomLen, GeomPiece, NucStr};
 
@@ -44,6 +44,7 @@ impl Default for SeqPair {
     }
 }
 
+const BOUNDED_RANGE_LIMIT: u32 = 4;
 const VAR_LEN_BC_PADDING: &[&str] = &["A", "AC", "AAG", "AAAT"];
 
 /// Builds the parsed output string `s` given the `CaptureLocations` `clocs`,
@@ -90,10 +91,10 @@ fn parse_single_read(
 }
 
 impl FragmentRegexDesc {
-    /// Parses the read pair `r1` and `r2` in accordance with the geometry specified 
-    /// in `self`.  The resulting parse, if successful, is placed into the output 
-    /// `sp`. This function returns true if the entire *pair* of reads was parsed succesfully, 
-    /// and false otherwise. If the parse is not successful, nothing can be assumed about 
+    /// Parses the read pair `r1` and `r2` in accordance with the geometry specified
+    /// in `self`.  The resulting parse, if successful, is placed into the output
+    /// `sp`. This function returns true if the entire *pair* of reads was parsed succesfully,
+    /// and false otherwise. If the parse is not successful, nothing can be assumed about
     /// the contents of `sp`.
     pub fn parse_into(&mut self, r1: &[u8], r2: &[u8], sp: &mut SeqPair) -> bool {
         sp.clear();
@@ -117,7 +118,7 @@ pub trait FragmentGeomDescExt {
     fn as_regex(&self) -> Result<FragmentRegexDesc, anyhow::Error>;
 }
 
-fn geom_piece_as_regex_string(gp: &GeomPiece) -> (String, Option<GeomPiece>) {
+fn geom_piece_as_regex_string(gp: &GeomPiece) -> Result<(String, Option<GeomPiece>)> {
     let mut rep = String::from("");
     let mut geo = None;
     match gp {
@@ -140,18 +141,34 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> (String, Option<GeomPiece>) {
         }
         // length ranges
         GeomPiece::Discard(GeomLen::BoundedRange(l, h)) => {
+            if h - l > BOUNDED_RANGE_LIMIT {
+                bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
+                    BOUNDED_RANGE_LIMIT, &gp, h-l);
+            }
             rep += &format!(r#"[ACGTN]{{{},{}}}"#, l, h);
             // don't need to capture
         }
         GeomPiece::Barcode(GeomLen::BoundedRange(l, h)) => {
+            if h - l > BOUNDED_RANGE_LIMIT {
+                bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
+                    BOUNDED_RANGE_LIMIT, &gp, h-l);
+            }
             rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
             geo = Some(gp.clone());
         }
         GeomPiece::Umi(GeomLen::BoundedRange(l, h)) => {
+            if h - l > BOUNDED_RANGE_LIMIT {
+                bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
+                    BOUNDED_RANGE_LIMIT, &gp, h-l);
+            }
             rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
             geo = Some(gp.clone());
         }
         GeomPiece::ReadSeq(GeomLen::BoundedRange(l, h)) => {
+            if h - l > BOUNDED_RANGE_LIMIT {
+                bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
+                    BOUNDED_RANGE_LIMIT, &gp, h-l);
+            }
             rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
             geo = Some(gp.clone());
         }
@@ -178,7 +195,7 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> (String, Option<GeomPiece>) {
             geo = Some(gp.clone());
         }
     }
-    (rep, geo)
+    Ok((rep, geo))
 }
 
 impl FragmentGeomDescExt for FragmentGeomDesc {
@@ -186,7 +203,7 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
         let mut r1_re_str = String::from("");
         let mut r1_cginfo = Vec::<GeomPiece>::new();
         for geo_piece in &self.read1_desc {
-            let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece);
+            let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece)?;
             r1_re_str += &str_piece;
             if let Some(elem) = geo_len {
                 r1_cginfo.push(elem);
@@ -196,7 +213,7 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
         let mut r2_re_str = String::from("");
         let mut r2_cginfo = Vec::<GeomPiece>::new();
         for geo_piece in &self.read2_desc {
-            let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece);
+            let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece)?;
             r2_re_str += &str_piece;
             if let Some(elem) = geo_len {
                 r2_cginfo.push(elem);
