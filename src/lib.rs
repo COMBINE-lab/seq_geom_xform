@@ -1,11 +1,11 @@
-use seq_geom_parser::{FragmentGeomDesc, GeomPiece, GeomLen, NucStr};
-use regex::bytes::Regex;
 use anyhow::{Context, Result};
+use regex::bytes::{CaptureLocations, Regex};
+use seq_geom_parser::{FragmentGeomDesc, GeomLen, GeomPiece, NucStr};
 
 /*
 #[derive(Debug, Display, Clone, Copy)]
 enum TypedGenomLen{
-    
+
 }
 */
 
@@ -13,27 +13,69 @@ enum TypedGenomLen{
 pub struct FragmentRegexDesc {
     pub r1_cginfo: Vec<GeomPiece>,
     pub r2_cginfo: Vec<GeomPiece>,
-    pub r1_re : Regex,
-    pub r2_re : Regex
+    pub r1_re: Regex,
+    pub r2_re: Regex,
+    r1_clocs: CaptureLocations,
+    r2_clocs: CaptureLocations,
 }
 
 pub struct SeqPair {
-    pub s1 : String,
-    pub s2 : String,
+    pub s1: String,
+    pub s2: String,
 }
 
-impl FragmentRegexDesc {
-    fn parse_into(&self, sp: &mut SeqPair) {
+impl SeqPair {
+    pub fn new() -> Self {
+        SeqPair { s1: String::new(), s2: String::new() }
+    }
 
+    fn clear(&mut self) {
+        self.s1.clear();
+        self.s2.clear();
     }
 }
 
-/// Extension methods for FragmentGeomDesc 
+impl FragmentRegexDesc {
+    pub fn parse_into(&mut self, r1: &[u8], r2: &[u8], sp: &mut SeqPair) {
+        sp.clear();
+        let m1 = self.r1_re.captures_read(&mut self.r1_clocs, r1);
+        let m2 = self.r2_re.captures_read(&mut self.r2_clocs, r2);
+
+        let s1 = unsafe { std::str::from_utf8_unchecked(r1) };
+        let s2 = unsafe { std::str::from_utf8_unchecked(r2) };
+
+        // walk over the capture groups 
+        
+        // if we expected to capture the whole thing
+        if self.r1_cginfo.len() > 1 {
+           sp.s1 = String::from(s1);
+        } else {
+            for cl in 1..self.r1_clocs.len() {
+                if let Some(g) = self.r1_clocs.get(cl) {
+                    sp.s1 += s1.get(g.0..g.1).unwrap();
+                }
+            }
+        }
+
+        // if we expected to capture the whole thing
+        if self.r2_cginfo.len() > 1 {
+           sp.s2 = String::from(s2);
+        } else {
+            for cl in 1..self.r2_clocs.len() {
+                if let Some(g) = self.r2_clocs.get(cl) {
+                    sp.s2 += s2.get(g.0..g.1).unwrap();
+                }
+            }
+        }
+    }
+}
+
+/// Extension methods for FragmentGeomDesc
 pub trait FragmentGeomDescExt {
     fn as_regex(&self) -> Result<FragmentRegexDesc, anyhow::Error>;
 }
 
-fn geom_piece_as_regex_string(gp: &GeomPiece) -> (String, Option<GeomPiece>){
+fn geom_piece_as_regex_string(gp: &GeomPiece) -> (String, Option<GeomPiece>) {
     let mut rep = String::from("");
     let mut geo = None;
     match gp {
@@ -55,23 +97,23 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> (String, Option<GeomPiece>){
             geo = Some(gp.clone());
         }
         // length ranges
-        GeomPiece::Discard(GeomLen::BoundedRange(l,h)) => {
+        GeomPiece::Discard(GeomLen::BoundedRange(l, h)) => {
             rep += &format!(r#"[ACGTN]{{{},{}}}"#, l, h);
             // don't need to capture
         }
-        GeomPiece::Barcode(GeomLen::BoundedRange(l,h)) => {
+        GeomPiece::Barcode(GeomLen::BoundedRange(l, h)) => {
             rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
             geo = Some(gp.clone());
         }
-        GeomPiece::Umi(GeomLen::BoundedRange(l,h)) => {
+        GeomPiece::Umi(GeomLen::BoundedRange(l, h)) => {
             rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
             geo = Some(gp.clone());
         }
-        GeomPiece::ReadSeq(GeomLen::BoundedRange(l,h)) => {
+        GeomPiece::ReadSeq(GeomLen::BoundedRange(l, h)) => {
             rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
             geo = Some(gp.clone());
         }
-        // fixed sequence 
+        // fixed sequence
         GeomPiece::Fixed(NucStr::Seq(s)) => {
             // no caputre group because no need to capture this
             // right now
@@ -102,30 +144,43 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
         let mut r1_re_str = String::from("");
         let mut r1_cginfo = Vec::<GeomPiece>::new();
         for geo_piece in &self.read1_desc {
-            let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece); 
+            let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece);
             r1_re_str += &str_piece;
-            if let Some(elem) = geo_len { r1_cginfo.push(elem); }
+            if let Some(elem) = geo_len {
+                r1_cginfo.push(elem);
+            }
         }
 
         let mut r2_re_str = String::from("");
         let mut r2_cginfo = Vec::<GeomPiece>::new();
         for geo_piece in &self.read2_desc {
-           let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece); 
-           r2_re_str += &str_piece;
-           if let Some(elem) = geo_len { r2_cginfo.push(elem); }
+            let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece);
+            r2_re_str += &str_piece;
+            if let Some(elem) = geo_len {
+                r2_cginfo.push(elem);
+            }
         }
 
-        let r1_re = Regex::new(&r1_re_str).with_context(|| 
-            format!("Could not compile {} into regex description", r1_re_str))?;
-        let r2_re = Regex::new(&r2_re_str).with_context(|| 
-            format!("Could not compile {} into regex description", r2_re_str))?;
+        let r1_re = Regex::new(&r1_re_str)
+            .with_context(|| format!("Could not compile {} into regex description", r1_re_str))?;
+        let r2_re = Regex::new(&r2_re_str)
+            .with_context(|| format!("Could not compile {} into regex description", r2_re_str))?;
         println!("{:?}", r1_cginfo);
         println!("{:?}", r2_cginfo);
-        Ok(FragmentRegexDesc{r1_cginfo, r2_cginfo, r1_re, r2_re})
+
+        let cloc1 = r1_re.capture_locations();
+        let cloc2 = r2_re.capture_locations();
+
+        Ok(FragmentRegexDesc {
+            r1_cginfo,
+            r2_cginfo,
+            r1_re,
+            r2_re,
+            r1_clocs: cloc1,
+            r2_clocs: cloc2
+        })
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
