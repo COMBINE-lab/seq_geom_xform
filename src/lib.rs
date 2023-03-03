@@ -26,7 +26,10 @@ pub struct SeqPair {
 
 impl SeqPair {
     pub fn new() -> Self {
-        SeqPair { s1: String::new(), s2: String::new() }
+        SeqPair {
+            s1: String::new(),
+            s2: String::new(),
+        }
     }
 
     fn clear(&mut self) {
@@ -35,8 +38,51 @@ impl SeqPair {
     }
 }
 
+const VAR_LEN_BC_PADDING: &'static [&'static str] = &["A", "AC", "AAG", "AAAT"];
+
+#[inline(always)]
+fn parse_single_read(
+    clocs: &CaptureLocations,
+    gpieces: &Vec<GeomPiece>,
+    r: &str,
+    outstr: &mut String,
+) -> bool {
+    // if we expected to capture the whole thing
+    if gpieces.len() == 1 {
+        // then just copy it over into our string
+        outstr.push_str(r);
+    } else {
+        // otherwise, process each capture group
+        for cl in 1..clocs.len() {
+            if let Some(g) = clocs.get(cl) {
+                outstr.push_str(r.get(g.0..g.1).unwrap());
+
+                match gpieces.get(cl - 1) {
+                    // if we captured some variable length piece of geometry
+                    // then we have to apply the appropriate padding so that
+                    // we can pass the result to a non-variable length parser.
+                    Some(GeomPiece::Barcode(GeomLen::BoundedRange(_l, h)))
+                    | Some(GeomPiece::Umi(GeomLen::BoundedRange(_l, h)))
+                    | Some(GeomPiece::ReadSeq(GeomLen::BoundedRange(_l, h))) => {
+                        let captured_len = (g.1 - g.0) as usize;
+                        outstr.push_str(VAR_LEN_BC_PADDING[(*h as usize) - (captured_len)]);
+                    }
+                    _ => {
+                        // fixed length, do nothing
+                    }
+                }
+            } else {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 impl FragmentRegexDesc {
-    pub fn parse_into(&mut self, r1: &[u8], r2: &[u8], sp: &mut SeqPair) {
+    /// returns true if the entire *pair* of reads was parsed succesfully, and false
+    /// otherwise
+    pub fn parse_into(&mut self, r1: &[u8], r2: &[u8], sp: &mut SeqPair) -> bool {
         sp.clear();
         let m1 = self.r1_re.captures_read(&mut self.r1_clocs, r1);
         let m2 = self.r2_re.captures_read(&mut self.r2_clocs, r2);
@@ -44,28 +90,11 @@ impl FragmentRegexDesc {
         let s1 = unsafe { std::str::from_utf8_unchecked(r1) };
         let s2 = unsafe { std::str::from_utf8_unchecked(r2) };
 
-        // walk over the capture groups 
-        
-        // if we expected to capture the whole thing
-        if self.r1_cginfo.len() > 1 {
-           sp.s1 = String::from(s1);
+        let parsed_r1 = parse_single_read(&self.r1_clocs, &self.r1_cginfo, &s1, &mut sp.s1);
+        if parsed_r1 {
+            return parse_single_read(&self.r2_clocs, &self.r2_cginfo, &s2, &mut sp.s2);
         } else {
-            for cl in 1..self.r1_clocs.len() {
-                if let Some(g) = self.r1_clocs.get(cl) {
-                    sp.s1 += s1.get(g.0..g.1).unwrap();
-                }
-            }
-        }
-
-        // if we expected to capture the whole thing
-        if self.r2_cginfo.len() > 1 {
-           sp.s2 = String::from(s2);
-        } else {
-            for cl in 1..self.r2_clocs.len() {
-                if let Some(g) = self.r2_clocs.get(cl) {
-                    sp.s2 += s2.get(g.0..g.1).unwrap();
-                }
-            }
+            return false;
         }
     }
 }
@@ -177,7 +206,7 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
             r1_re,
             r2_re,
             r1_clocs: cloc1,
-            r2_clocs: cloc2
+            r2_clocs: cloc2,
         })
     }
 }

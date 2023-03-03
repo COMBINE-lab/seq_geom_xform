@@ -27,9 +27,13 @@ fn main() {
         while let (Some(record), Some(record2)) = (reader.next(), reader2.next()) {
             let seqrec = record.expect("invalid record");
             let seqrec2 = record2.expect("invalid record");
-            
-            geo_re.parse_into(seqrec.sequence(), seqrec2.sequence(), &mut parsed_records);
-            println!("parsed (r1, r2) = ({}, {})", parsed_records.s1, parsed_records.s2);
+
+            if geo_re.parse_into(seqrec.sequence(), seqrec2.sequence(), &mut parsed_records) {
+                println!(
+                    "parsed (r1, r2) = ({}, {})",
+                    parsed_records.s1, parsed_records.s2
+                );
+            }
         }
     }
 
