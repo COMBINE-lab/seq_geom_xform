@@ -18,3 +18,5 @@ regex = "1.7"
 anyhow = "1.0"
 needletail = "0.5.0"
 clap = { version = "4.1.8", features = ["derive"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", default-features = true, features = ["env-filter"] }

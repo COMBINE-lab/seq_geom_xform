@@ -9,6 +9,10 @@ use seq_geom_xform::FragmentGeomDescExt;
 use anyhow::Result;
 use needletail::{parse_fastx_file, Sequence};
 
+use tracing::info;
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -48,23 +52,30 @@ fn process_reads(args: Args) -> Result<()> {
 
     match geo.as_regex() {
         Ok(mut geo_re) => {
-            println!(
+            info!(
                 "geometry as regex = Read1 : {:?}, Read2 : {:?}",
                 geo_re.r1_re, geo_re.r2_re
             );
 
             let simp_desc = geo_re.get_simplified_piscem_description_string();
-            println!("simplified description of geometry is {}", simp_desc);
+            info!(
+                "description the simplified version of this geometry is {}",
+                simp_desc
+            );
 
             let simp_desc = geo_re.get_simplified_geo_desc();
-            println!("simplified description again {:?}, {:?}", &simp_desc.read1_desc, &simp_desc.read2_desc);
 
             let pd = PiscemGeomDesc::from_geom_pieces(&simp_desc.read1_desc, &simp_desc.read2_desc);
-            println!("simplified piscem description again {:?}, {:?}", &pd.read1_desc, &pd.read2_desc);
+            info!(
+                "piscem description of simplified geometry {:?}, {:?}",
+                &pd.read1_desc, &pd.read2_desc
+            );
 
-
-            let sd = SalmonSeparateGeomDesc::from_geom_pieces(&simp_desc.read1_desc, &simp_desc.read2_desc);
-            println!("simplified piscem description again {:?}", &sd);
+            let sd = SalmonSeparateGeomDesc::from_geom_pieces(
+                &simp_desc.read1_desc,
+                &simp_desc.read2_desc,
+            );
+            info!("salmon description of simplified geometry {:?}", &sd);
 
             for (filename1, filename2) in args.read1.iter().zip(args.read2.iter()) {
                 let mut reader = parse_fastx_file(filename1).expect("valid path/file");
@@ -102,6 +113,15 @@ fn process_reads(args: Args) -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .init();
+
     let args = Args::parse();
     process_reads(args)
 }
