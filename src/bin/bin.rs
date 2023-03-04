@@ -3,7 +3,7 @@ use std::io::{BufWriter, Write};
 
 use clap::Parser;
 
-use seq_geom_parser::{FragmentGeomDesc, PiscemGeomDesc};
+use seq_geom_parser::{FragmentGeomDesc, PiscemGeomDesc, SalmonSeparateGeomDesc};
 use seq_geom_xform::FragmentGeomDescExt;
 
 use anyhow::Result;
@@ -62,6 +62,9 @@ fn process_reads(args: Args) -> Result<()> {
             let pd = PiscemGeomDesc::from_geom_pieces(&simp_desc.read1_desc, &simp_desc.read2_desc);
             println!("simplified piscem description again {:?}, {:?}", &pd.read1_desc, &pd.read2_desc);
 
+
+            let sd = SalmonSeparateGeomDesc::from_geom_pieces(&simp_desc.read1_desc, &simp_desc.read2_desc);
+            println!("simplified piscem description again {:?}", &sd);
 
             for (filename1, filename2) in args.read1.iter().zip(args.read2.iter()) {
                 let mut reader = parse_fastx_file(filename1).expect("valid path/file");
