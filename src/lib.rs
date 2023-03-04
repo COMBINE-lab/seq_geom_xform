@@ -90,6 +90,53 @@ fn parse_single_read(
     true
 }
 
+
+fn get_simplified_piscem_string(geo_pieces: &[GeomPiece]) -> String {
+    let mut rep = String::new();
+    for gp in geo_pieces {
+        match gp {
+            GeomPiece::Discard(GeomLen::Bounded(x)) => {
+                rep += &format!("x[{}]", x);
+            }
+            GeomPiece::Barcode(GeomLen::Bounded(x)) => {
+                rep += &format!("b[{}]", x);
+            }
+            GeomPiece::Umi(GeomLen::Bounded(x)) => {
+                rep += &format!("u[{}]", x);
+            }
+            GeomPiece::ReadSeq(GeomLen::Bounded(x)) => {
+                rep += &format!("r[{}]", x);
+            }
+            GeomPiece::Discard(GeomLen::BoundedRange(_l, h)) => {
+                rep += &format!("x[{}]", h+1);
+            }
+            GeomPiece::Barcode(GeomLen::BoundedRange(_l, h)) => {
+                rep += &format!("b[{}]", h+1);
+            }
+            GeomPiece::Umi(GeomLen::BoundedRange(_l, h)) => {
+                rep += &format!("u[{}]", h+1);
+            }
+            GeomPiece::ReadSeq(GeomLen::BoundedRange(_l, h)) => {
+                rep += &format!("r[{}]", h+1);
+            }
+            GeomPiece::Discard(GeomLen::Unbounded) => {
+                rep += "x:";
+            }
+            GeomPiece::Barcode(GeomLen::Unbounded) => {
+                rep += "b:";
+            }
+            GeomPiece::Umi(GeomLen::Unbounded) => {
+                rep += "u:";
+            }
+            GeomPiece::ReadSeq(GeomLen::Unbounded) => {
+                rep += "r:";
+            }
+            _ => { unimplemented!(); }
+        }
+    }
+    rep
+}
+
 impl FragmentRegexDesc {
     /// Parses the read pair `r1` and `r2` in accordance with the geometry specified
     /// in `self`.  The resulting parse, if successful, is placed into the output
@@ -110,6 +157,19 @@ impl FragmentRegexDesc {
         } else {
             false
         }
+    }
+
+    pub fn get_simplified_piscem_description_string(&self) -> String {
+        let mut rep= String::from("");
+        if !self.r1_cginfo.is_empty() {
+            let d = get_simplified_piscem_string(&self.r1_cginfo);
+            rep += &format!("1{{{}}}", d);
+        }
+        if !self.r2_cginfo.is_empty() {
+            let d = get_simplified_piscem_string(&self.r2_cginfo);
+            rep += &format!("2{{{}}}", d);
+        }
+        rep 
     }
 }
 

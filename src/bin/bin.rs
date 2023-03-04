@@ -54,6 +54,11 @@ fn process_reads(args: Args) -> Result<()> {
                 geo_re.r1_re, geo_re.r2_re
             );
 
+            let simp_desc = geo_re.get_simplified_piscem_description_string();
+            println!(
+                "simplified description of geometry is {}", simp_desc
+            );
+
             for (filename1, filename2) in args.read1.iter().zip(args.read2.iter()) {
                 let mut reader = parse_fastx_file(&filename1).expect("valid path/file");
                 let mut reader2 = parse_fastx_file(&filename2).expect("valid path/file");
