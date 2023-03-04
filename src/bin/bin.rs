@@ -13,27 +13,26 @@ use needletail::{parse_fastx_file, Sequence};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-   /// Expected input read geometry
-   #[arg(short, long)]
-   geom: String,
+    /// Expected input read geometry
+    #[arg(short, long)]
+    geom: String,
 
-   /// read 1 files
-   #[arg(short = '1', long)]
-   read1: Vec<String>,
+    /// read 1 files
+    #[arg(short = '1', long)]
+    read1: Vec<String>,
 
     /// read 2 files
-   #[arg(short = '2', long)]
-   read2: Vec<String>,
+    #[arg(short = '2', long)]
+    read2: Vec<String>,
 
-   /// where output r1 should be written
-   #[arg(short = 'o', long)]
-   out1: String,
+    /// where output r1 should be written
+    #[arg(short = 'o', long)]
+    out1: String,
 
     /// where output r2 should be written
-   #[arg(short = 'w', long)]
-   out2: String,
+    #[arg(short = 'w', long)]
+    out2: String,
 }
-
 
 fn process_reads(args: Args) -> Result<()> {
     let gd = args.geom;
@@ -55,23 +54,34 @@ fn process_reads(args: Args) -> Result<()> {
             );
 
             let simp_desc = geo_re.get_simplified_piscem_description_string();
-            println!(
-                "simplified description of geometry is {}", simp_desc
-            );
+            println!("simplified description of geometry is {}", simp_desc);
 
             for (filename1, filename2) in args.read1.iter().zip(args.read2.iter()) {
-                let mut reader = parse_fastx_file(&filename1).expect("valid path/file");
-                let mut reader2 = parse_fastx_file(&filename2).expect("valid path/file");
+                let mut reader = parse_fastx_file(filename1).expect("valid path/file");
+                let mut reader2 = parse_fastx_file(filename2).expect("valid path/file");
 
                 while let (Some(record), Some(record2)) = (reader.next(), reader2.next()) {
                     let seqrec = record.expect("invalid record");
                     let seqrec2 = record2.expect("invalid record");
 
-                    if geo_re.parse_into(seqrec.sequence(), seqrec2.sequence(), &mut parsed_records) {
+                    if geo_re.parse_into(seqrec.sequence(), seqrec2.sequence(), &mut parsed_records)
+                    {
                         unsafe {
-                            std::write!(&mut stream1, ">{}\n{}\n", std::str::from_utf8_unchecked(seqrec.id()), parsed_records.s1).expect("couldn't write output to file 1");
-                            std::write!(&mut stream2, ">{}\n{}\n", std::str::from_utf8_unchecked(seqrec2.id()), parsed_records.s2).expect("couldn't write output to file 2");
-                         }
+                            std::write!(
+                                &mut stream1,
+                                ">{}\n{}\n",
+                                std::str::from_utf8_unchecked(seqrec.id()),
+                                parsed_records.s1
+                            )
+                            .expect("couldn't write output to file 1");
+                            std::write!(
+                                &mut stream2,
+                                ">{}\n{}\n",
+                                std::str::from_utf8_unchecked(seqrec2.id()),
+                                parsed_records.s2
+                            )
+                            .expect("couldn't write output to file 2");
+                        }
                     }
                 }
             }
@@ -79,9 +89,7 @@ fn process_reads(args: Args) -> Result<()> {
         }
         Err(e) => Err(e),
     }
-
 }
-
 
 fn main() -> Result<()> {
     let args = Args::parse();

@@ -75,7 +75,7 @@ fn parse_single_read(
                     Some(GeomPiece::Barcode(GeomLen::BoundedRange(_l, h)))
                     | Some(GeomPiece::Umi(GeomLen::BoundedRange(_l, h)))
                     | Some(GeomPiece::ReadSeq(GeomLen::BoundedRange(_l, h))) => {
-                        let captured_len = (g.1 - g.0) as usize;
+                        let captured_len = g.1 - g.0;
                         outstr.push_str(VAR_LEN_BC_PADDING[(*h as usize) - (captured_len)]);
                     }
                     _ => {
@@ -89,7 +89,6 @@ fn parse_single_read(
     }
     true
 }
-
 
 fn get_simplified_piscem_string(geo_pieces: &[GeomPiece]) -> String {
     let mut rep = String::new();
@@ -107,17 +106,21 @@ fn get_simplified_piscem_string(geo_pieces: &[GeomPiece]) -> String {
             GeomPiece::ReadSeq(GeomLen::Bounded(x)) => {
                 rep += &format!("r[{}]", x);
             }
+            // NOTE: the + 1 in the rules below assumes we will
+            // only ever have variable width of geometry pieces
+            // of at most 4 bases. If we need to every move
+            // beyond that, this code will have to be generalized.
             GeomPiece::Discard(GeomLen::BoundedRange(_l, h)) => {
-                rep += &format!("x[{}]", h+1);
+                rep += &format!("x[{}]", h + 1);
             }
             GeomPiece::Barcode(GeomLen::BoundedRange(_l, h)) => {
-                rep += &format!("b[{}]", h+1);
+                rep += &format!("b[{}]", h + 1);
             }
             GeomPiece::Umi(GeomLen::BoundedRange(_l, h)) => {
-                rep += &format!("u[{}]", h+1);
+                rep += &format!("u[{}]", h + 1);
             }
             GeomPiece::ReadSeq(GeomLen::BoundedRange(_l, h)) => {
-                rep += &format!("r[{}]", h+1);
+                rep += &format!("r[{}]", h + 1);
             }
             GeomPiece::Discard(GeomLen::Unbounded) => {
                 rep += "x:";
@@ -131,7 +134,9 @@ fn get_simplified_piscem_string(geo_pieces: &[GeomPiece]) -> String {
             GeomPiece::ReadSeq(GeomLen::Unbounded) => {
                 rep += "r:";
             }
-            _ => { unimplemented!(); }
+            _ => {
+                unimplemented!();
+            }
         }
     }
     rep
@@ -160,7 +165,7 @@ impl FragmentRegexDesc {
     }
 
     pub fn get_simplified_piscem_description_string(&self) -> String {
-        let mut rep= String::from("");
+        let mut rep = String::from("");
         if !self.r1_cginfo.is_empty() {
             let d = get_simplified_piscem_string(&self.r1_cginfo);
             rep += &format!("1{{{}}}", d);
@@ -169,7 +174,7 @@ impl FragmentRegexDesc {
             let d = get_simplified_piscem_string(&self.r2_cginfo);
             rep += &format!("2{{{}}}", d);
         }
-        rep 
+        rep
     }
 }
 
