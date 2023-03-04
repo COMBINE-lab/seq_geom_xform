@@ -17,3 +17,4 @@ seq_geom_parser = { git = "https://github.com/COMBINE-lab/seq_geom_parser", bran
 regex = "1.7"
 anyhow = "1.0"
 needletail = "0.5.0"
+clap = { version = "4.1.8", features = ["derive"] }
