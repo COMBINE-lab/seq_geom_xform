@@ -142,6 +142,28 @@ fn get_simplified_piscem_string(geo_pieces: &[GeomPiece]) -> String {
     rep
 }
 
+fn get_simplified_geo(gp : &GeomPiece) -> GeomPiece {
+    match gp {
+        // NOTE: the + 1 in the rules below assumes we will
+        // only ever have variable width of geometry pieces
+        // of at most 4 bases. If we need to every move
+        // beyond that, this code will have to be generalized.
+        GeomPiece::Discard(GeomLen::BoundedRange(_l, h)) => {
+            GeomPiece::Discard(GeomLen::Bounded(h+1))
+        }
+        GeomPiece::Barcode(GeomLen::BoundedRange(_l, h)) => {
+            GeomPiece::Barcode(GeomLen::Bounded(h+1))
+        }
+        GeomPiece::Umi(GeomLen::BoundedRange(_l, h)) => {
+            GeomPiece::Umi(GeomLen::Bounded(h+1))
+        }
+        GeomPiece::ReadSeq(GeomLen::BoundedRange(_l, h)) => {
+            GeomPiece::ReadSeq(GeomLen::Bounded(h+1))
+        }
+        _ => { gp.clone() }
+    }
+}
+
 impl FragmentRegexDesc {
     /// Parses the read pair `r1` and `r2` in accordance with the geometry specified
     /// in `self`.  The resulting parse, if successful, is placed into the output
@@ -161,6 +183,13 @@ impl FragmentRegexDesc {
             parse_single_read(&self.r2_clocs, &self.r2_cginfo, s2, &mut sp.s2)
         } else {
             false
+        }
+    }
+
+    pub fn get_simplified_geo_desc(&self) -> FragmentGeomDesc {
+        FragmentGeomDesc{
+            read1_desc : self.r1_cginfo.iter().map(|x| { get_simplified_geo(&x) }).collect::<Vec<GeomPiece>>(),
+            read2_desc : self.r2_cginfo.iter().map(|x| { get_simplified_geo(&x) }).collect::<Vec<GeomPiece>>(),
         }
     }
 
