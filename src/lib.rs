@@ -300,7 +300,7 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> Result<(String, Option<GeomPiec
 
 impl FragmentGeomDescExt for FragmentGeomDesc {
     fn as_regex(&self) -> Result<FragmentRegexDesc, anyhow::Error> {
-        let mut r1_re_str = String::from("");
+        let mut r1_re_str = String::from("^");
         let mut r1_cginfo = Vec::<GeomPiece>::new();
         for geo_piece in &self.read1_desc {
             let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece)?;
@@ -310,7 +310,22 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
             }
         }
 
-        let mut r2_re_str = String::from("");
+        // This seems to lead to a slight performance improvement, but consider if
+        // we really want to do this.  This checks if the last GeomPiece in the
+        // current description is bounded or not.  If so (i.e. if it is bounded), then
+        // we add an unbounded `Discard` GeomPiece to the end followed by the
+        // end of string anchor.  This anchoring of the regex (seemingly) makes matching a
+        // little bit faster.
+        if let Some(geo_piece) = &self.read1_desc.last() {
+            if geo_piece.is_bounded() {
+                let (str_piece, _geo_len) =
+                    geom_piece_as_regex_string(&GeomPiece::Discard(GeomLen::Unbounded))?;
+                r1_re_str += &str_piece;
+            }
+        }
+        r1_re_str.push_str(r#"$"#);
+
+        let mut r2_re_str = String::from("^");
         let mut r2_cginfo = Vec::<GeomPiece>::new();
         for geo_piece in &self.read2_desc {
             let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece)?;
@@ -319,6 +334,21 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
                 r2_cginfo.push(elem);
             }
         }
+
+        // This seems to lead to a slight performance improvement, but consider if
+        // we really want to do this.  This checks if the last GeomPiece in the
+        // current description is bounded or not.  If so (i.e. if it is bounded), then
+        // we add an unbounded `Discard` GeomPiece to the end followed by the
+        // end of string anchor.  This anchoring of the regex (seemingly) makes matching a
+        // little bit faster.
+        if let Some(geo_piece) = &self.read2_desc.last() {
+            if geo_piece.is_bounded() {
+                let (str_piece, _geo_len) =
+                    geom_piece_as_regex_string(&GeomPiece::Discard(GeomLen::Unbounded))?;
+                r2_re_str += &str_piece;
+            }
+        }
+        r2_re_str.push_str(r#"$"#);
 
         let r1_re = Regex::new(&r1_re_str)
             .with_context(|| format!("Could not compile {} into regex description", r1_re_str))?;
