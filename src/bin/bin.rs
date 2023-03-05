@@ -13,27 +13,28 @@ use tracing::info;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-/// Simple program to greet a person
+/// Program to convert `complex` sequencing fragment geometries
+/// into a simpler (normalized) form.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Expected input read geometry
+    /// Expected input read geometry specification
     #[arg(short, long)]
     geom: String,
 
-    /// read 1 files
-    #[arg(short = '1', long)]
+    /// read 1 files, comma delimited
+    #[arg(short = '1', long, value_delimiter = ',')]
     read1: Vec<String>,
 
-    /// read 2 files
-    #[arg(short = '2', long)]
+    /// read 2 files, comma delimited
+    #[arg(short = '2', long, value_delimiter = ',')]
     read2: Vec<String>,
 
-    /// where output r1 should be written
+    /// where output r1 should be written (currently uncompressed)
     #[arg(short = 'o', long)]
     out1: String,
 
-    /// where output r2 should be written
+    /// where output r2 should be written (currently uncompressed)
     #[arg(short = 'w', long)]
     out2: String,
 }

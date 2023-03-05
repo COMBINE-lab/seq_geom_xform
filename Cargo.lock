@@ -488,8 +488,7 @@ checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
 [[package]]
 name = "seq_geom_parser"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28a812988203045b0b41c98bdd81a443d8901c7d7ea80349e68d5ff5925e5edf"
+source = "git+https://github.com/COMBINE-lab/seq_geom_parser?branch=dev#b1215abd6f9d760e5d46e134b1305fe9f111531d"
 dependencies = [
  "anyhow",
  "pest",
