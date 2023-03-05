@@ -189,12 +189,12 @@ impl FragmentRegexDesc {
             read1_desc: self
                 .r1_cginfo
                 .iter()
-                .map(|x| get_simplified_geo(&x))
+                .map(get_simplified_geo)
                 .collect::<Vec<GeomPiece>>(),
             read2_desc: self
                 .r2_cginfo
                 .iter()
-                .map(|x| get_simplified_geo(&x))
+                .map(get_simplified_geo)
                 .collect::<Vec<GeomPiece>>(),
         }
     }
@@ -323,7 +323,7 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
                 r1_re_str += &str_piece;
             }
         }
-        r1_re_str.push_str(r#"$"#);
+        r1_re_str.push('$');
 
         let mut r2_re_str = String::from("^");
         let mut r2_cginfo = Vec::<GeomPiece>::new();
@@ -348,7 +348,7 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
                 r2_re_str += &str_piece;
             }
         }
-        r2_re_str.push_str(r#"$"#);
+        r2_re_str.push('$');
 
         let r1_re = Regex::new(&r1_re_str)
             .with_context(|| format!("Could not compile {} into regex description", r1_re_str))?;

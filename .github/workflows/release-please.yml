@@ -1,0 +1,37 @@
+on:
+  push:
+    branches:
+      - main
+
+name: release-please
+
+jobs:
+  release-please:
+    if: github.repository_owner == 'COMBINE-lab'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: GoogleCloudPlatform/release-please-action@v3
+        id: release_seq_geom_xform
+        with:
+          release-type: rust
+          package-name: seq_geom_xform
+          path: .
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable 
+        if: ${{ steps.release_seq_geom_xform.outputs.release_created }}
+        with:
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1.3.0
+        if: ${{ steps.release_seq_geom_xform.outputs.release_created }}
+      
+      - name: Publish seq_geom_xform
+        if: ${{ steps.release_seq_geom_xform.outputs.release_created }}
+        run: cargo publish --token ${CRATES_TOKEN}
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+

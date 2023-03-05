@@ -3,7 +3,7 @@ use std::io::{BufWriter, Write};
 
 use clap::Parser;
 
-use seq_geom_parser::{FragmentGeomDesc, PiscemGeomDesc, SalmonSeparateGeomDesc};
+use seq_geom_parser::FragmentGeomDesc; // PiscemGeomDesc, SalmonSeparateGeomDesc};
 use seq_geom_xform::FragmentGeomDescExt;
 
 use anyhow::Result;
@@ -63,6 +63,7 @@ fn process_reads(args: Args) -> Result<()> {
                 simp_desc
             );
 
+            /*
             let simp_desc = geo_re.get_simplified_geo_desc();
 
             let pd = PiscemGeomDesc::from_geom_pieces(&simp_desc.read1_desc, &simp_desc.read2_desc);
@@ -76,6 +77,7 @@ fn process_reads(args: Args) -> Result<()> {
                 &simp_desc.read2_desc,
             );
             info!("salmon description of simplified geometry {:?}", &sd);
+            */
 
             for (filename1, filename2) in args.read1.iter().zip(args.read2.iter()) {
                 let mut reader = parse_fastx_file(filename1).expect("valid path/file");
