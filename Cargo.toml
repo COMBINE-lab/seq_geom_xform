@@ -2,6 +2,31 @@
 name = "seq_geom_xform"
 version = "0.1.0"
 edition = "2021"
+authors = [
+  "Rob Patro <rob@cs.umd.edu>"
+]
+description = "Transform/normalize complex single-cell fragment geometries into simple geometries."
+license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/COMBINE-lab/seq_geom_xform"
+homepage = "https://github.com/COMBINE-lab/seq_geom_xform"
+include = [
+  "/src/*.rs",
+  "/src/lib/*.rs",
+  "/src/bin/*.rs",
+  "/Cargo.toml",
+  "/Cargo.lock",
+  "/README.md",
+  "/LICENSE",
+  "/CONTRIBUTING.md",
+  "/CODE_OF_CONDUCT.md",
+]
+keywords = [
+  "single-cell",
+  "preprocessing",
+  "RNA-seq",
+]
+categories = ["command-line-utilities", "science"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -13,7 +38,7 @@ name = "seq_xformer"
 path = "src/bin/bin.rs"
 
 [dependencies]
-seq_geom_parser = { git = "https://github.com/COMBINE-lab/seq_geom_parser", branch = "dev", version = "0.1.1" }
+seq_geom_parser = { git = "https://github.com/COMBINE-lab/seq_geom_parser", branch = "dev", version = "0.1.2" }
 regex = "1.7"
 anyhow = "1.0"
 needletail = "0.5.0"
