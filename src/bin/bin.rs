@@ -69,12 +69,13 @@ fn process_reads(args: Args) -> Result<()> {
             );
             info!("salmon description of simplified geometry {:?}", &sd);
             */
+
             seq_geom_xform::xform_read_pairs_to_file(
                 geo_re,
-                args.read1.clone(),
-                args.read2.clone(),
-                args.out1.clone(),
-                args.out2.clone(),
+                args.read1,
+                args.read2,
+                args.out1,
+                args.out2,
             )?;
             Ok(())
         }
