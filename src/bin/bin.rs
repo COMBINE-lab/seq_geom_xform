@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::path::PathBuf;
 
 use clap::Parser;
 
@@ -24,35 +25,27 @@ struct Args {
 
     /// read 1 files, comma delimited
     #[arg(short = '1', long, value_delimiter = ',')]
-    read1: Vec<String>,
+    read1: Vec<PathBuf>,
 
     /// read 2 files, comma delimited
     #[arg(short = '2', long, value_delimiter = ',')]
-    read2: Vec<String>,
+    read2: Vec<PathBuf>,
 
     /// where output r1 should be written (currently uncompressed)
     #[arg(short = 'o', long)]
-    out1: String,
+    out1: PathBuf,
 
     /// where output r2 should be written (currently uncompressed)
     #[arg(short = 'w', long)]
-    out2: String,
+    out2: PathBuf,
 }
 
 fn process_reads(args: Args) -> Result<()> {
     let gd = args.geom;
     let geo = FragmentGeomDesc::try_from(gd.as_str()).unwrap();
 
-    let mut parsed_records = seq_geom_xform::SeqPair::new();
-
-    let f1 = File::create(&args.out1).expect("Unable to create file");
-    let f2 = File::create(&args.out2).expect("Unable to create file");
-
-    let mut stream1 = BufWriter::new(f1);
-    let mut stream2 = BufWriter::new(f2);
-
     match geo.as_regex() {
-        Ok(mut geo_re) => {
+        Ok(geo_re) => {
             info!(
                 "geometry as regex = Read1 : {:?}, Read2 : {:?}",
                 geo_re.r1_re, geo_re.r2_re
@@ -79,36 +72,13 @@ fn process_reads(args: Args) -> Result<()> {
             );
             info!("salmon description of simplified geometry {:?}", &sd);
             */
-
-            for (filename1, filename2) in args.read1.iter().zip(args.read2.iter()) {
-                let mut reader = parse_fastx_file(filename1).expect("valid path/file");
-                let mut reader2 = parse_fastx_file(filename2).expect("valid path/file");
-
-                while let (Some(record), Some(record2)) = (reader.next(), reader2.next()) {
-                    let seqrec = record.expect("invalid record");
-                    let seqrec2 = record2.expect("invalid record");
-
-                    if geo_re.parse_into(seqrec.sequence(), seqrec2.sequence(), &mut parsed_records)
-                    {
-                        unsafe {
-                            std::write!(
-                                &mut stream1,
-                                ">{}\n{}\n",
-                                std::str::from_utf8_unchecked(seqrec.id()),
-                                parsed_records.s1
-                            )
-                            .expect("couldn't write output to file 1");
-                            std::write!(
-                                &mut stream2,
-                                ">{}\n{}\n",
-                                std::str::from_utf8_unchecked(seqrec2.id()),
-                                parsed_records.s2
-                            )
-                            .expect("couldn't write output to file 2");
-                        }
-                    }
-                }
-            }
+            seq_geom_xform::xform_read_pairs_to_file(
+                geo_re,
+                args.read1.clone(),
+                args.read2.clone(),
+                args.out1.clone(),
+                args.out2.clone(),
+            )?;
             Ok(())
         }
         Err(e) => Err(e),

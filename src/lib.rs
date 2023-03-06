@@ -1,13 +1,18 @@
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::{Path, PathBuf};
+use std::thread;
+
 use anyhow::{bail, Context, Result};
 use regex::bytes::{CaptureLocations, Regex};
 use seq_geom_parser::{FragmentGeomDesc, GeomLen, GeomPiece, NucStr};
 
-/*
-#[derive(Debug, Display, Clone, Copy)]
-enum TypedGenomLen{
+use needletail::{parse_fastx_file, Sequence};
+use tracing::{info, warn};
 
-}
-*/
+use nix::sys::stat;
+use nix::unistd;
+use tempfile::tempdir;
 
 #[derive(Debug)]
 pub struct FragmentRegexDesc {
@@ -367,6 +372,103 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
             r2_clocs: cloc2,
         })
     }
+}
+
+/// The information we get back from an xform function
+/// that tells us the relevant information about the
+/// transformation taking place
+#[derive(Debug)]
+pub struct FifoXFormData {
+    pub r1_fifo: PathBuf,
+    pub r2_fifo: PathBuf,
+    pub join_handle: thread::JoinHandle<Result<()>>,
+}
+
+pub fn xform_read_pairs_to_file(
+    mut geo_re: FragmentRegexDesc,
+    r1: Vec<PathBuf>,
+    r2: Vec<PathBuf>,
+    r1_ofile: PathBuf,
+    r2_ofile: PathBuf,
+) -> Result<()> {
+    let f1 = File::create(r1_ofile).expect("Unable to open read 1 file");
+    let f2 = File::create(r2_ofile).expect("Unable to open read 2 file");
+
+    let mut stream1 = BufWriter::new(f1);
+    let mut stream2 = BufWriter::new(f2);
+
+    let mut parsed_records = SeqPair::new();
+    for (filename1, filename2) in r1.iter().zip(r2.iter()) {
+        let mut reader = parse_fastx_file(filename1).expect("valid path/file");
+        let mut reader2 = parse_fastx_file(filename2).expect("valid path/file");
+
+        while let (Some(record), Some(record2)) = (reader.next(), reader2.next()) {
+            let seqrec = record.expect("invalid record");
+            let seqrec2 = record2.expect("invalid record");
+
+            if geo_re.parse_into(seqrec.sequence(), seqrec2.sequence(), &mut parsed_records) {
+                unsafe {
+                    std::write!(
+                        &mut stream1,
+                        ">{}\n{}\n",
+                        std::str::from_utf8_unchecked(seqrec.id()),
+                        parsed_records.s1
+                    )
+                    .expect("couldn't write output to file 1");
+                    std::write!(
+                        &mut stream2,
+                        ">{}\n{}\n",
+                        std::str::from_utf8_unchecked(seqrec2.id()),
+                        parsed_records.s2
+                    )
+                    .expect("couldn't write output to file 2");
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn xform_read_pairs_to_fifo(
+    geo_re: FragmentRegexDesc,
+    r1: Vec<PathBuf>,
+    r2: Vec<PathBuf>,
+) -> Result<FifoXFormData> {
+    if r1.len() != r2.len() {
+        bail!(
+            "The number of R1 files ({}) must match the number of R2 files ({})",
+            r1.len(),
+            r2.len()
+        );
+    }
+
+    let tmp_dir = tempdir().unwrap();
+    let r1_fifo = tmp_dir.path().join("r1.pipe");
+    let r2_fifo = tmp_dir.path().join("r2.pipe");
+
+    // create new fifo and give read, write and execute rights to the owner
+    match unistd::mkfifo(&r1_fifo, stat::Mode::S_IRWXU) {
+        Ok(_) => info!("created {:?}", r1_fifo),
+        Err(err) => bail!("Error creating read 1 fifo: {}", err),
+    }
+    // create new fifo and give read, write and execute rights to the owner
+    match unistd::mkfifo(&r2_fifo, stat::Mode::S_IRWXU) {
+        Ok(_) => info!("created {:?}", r2_fifo),
+        Err(err) => bail!("Error creating read 2 fifo: {}", err),
+    }
+
+    let r1_fifo_clone = r1_fifo.clone();
+    let r2_fifo_clone = r2_fifo.clone();
+
+    let join_handle: thread::JoinHandle<Result<()>> = thread::spawn(move || {
+        xform_read_pairs_to_file(geo_re, r1, r2, r1_fifo_clone, r2_fifo_clone)
+    });
+
+    Ok(FifoXFormData {
+        r1_fifo,
+        r2_fifo,
+        join_handle,
+    })
 }
 
 #[cfg(test)]
