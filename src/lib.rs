@@ -467,6 +467,7 @@ pub fn xform_read_pairs_to_fifo(
     let r2_fifo_clone = r2_fifo.clone();
 
     let join_handle: thread::JoinHandle<Result<()>> = thread::spawn(move || {
+        let local_tmpdir = tmp_dir;
         xform_read_pairs_to_file(geo_re, r1, r2, r1_fifo_clone, r2_fifo_clone)
     });
 
