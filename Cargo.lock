@@ -550,7 +550,7 @@ checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
 [[package]]
 name = "seq_geom_parser"
 version = "0.1.2"
-source = "git+https://github.com/COMBINE-lab/seq_geom_parser?branch=dev#f98450b9920489c949c95120dd00dbd61de68eee"
+source = "git+https://github.com/COMBINE-lab/seq_geom_parser?branch=dev#d1a497bf7e41ef9eb717936a5e52b7ecf0fca4af"
 dependencies = [
  "anyhow",
  "pest",
