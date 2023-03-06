@@ -448,12 +448,18 @@ pub fn xform_read_pairs_to_fifo(
 
     // create new fifo and give read, write and execute rights to the owner
     match unistd::mkfifo(&r1_fifo, stat::Mode::S_IRWXU) {
-        Ok(_) => info!("created {:?}", r1_fifo),
+        Ok(_) => {
+            info!("created {:?}", r1_fifo);
+            assert!(std::path::Path::new(&r1_fifo).exists()); 
+        },
         Err(err) => bail!("Error creating read 1 fifo: {}", err),
     }
     // create new fifo and give read, write and execute rights to the owner
     match unistd::mkfifo(&r2_fifo, stat::Mode::S_IRWXU) {
-        Ok(_) => info!("created {:?}", r2_fifo),
+        Ok(_) => { 
+            info!("created {:?}", r2_fifo); 
+            assert!(std::path::Path::new(&r2_fifo).exists());
+        },
         Err(err) => bail!("Error creating read 2 fifo: {}", err),
     }
 
