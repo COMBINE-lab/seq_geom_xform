@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::thread;
 
 use anyhow::{bail, Context, Result};
@@ -8,7 +8,7 @@ use regex::bytes::{CaptureLocations, Regex};
 use seq_geom_parser::{FragmentGeomDesc, GeomLen, GeomPiece, NucStr};
 
 use needletail::{parse_fastx_file, Sequence};
-use tracing::{info, warn};
+use tracing::info;
 
 use nix::sys::stat;
 use nix::unistd;
@@ -204,7 +204,7 @@ impl FragmentRegexDesc {
         }
     }
 
-    pub fn get_simplified_piscem_description_string(&self) -> String {
+    pub fn get_simplified_description_string(&self) -> String {
         let mut rep = String::from("");
         if !self.r1_cginfo.is_empty() {
             let d = get_simplified_piscem_string(&self.r1_cginfo);
@@ -450,16 +450,16 @@ pub fn xform_read_pairs_to_fifo(
     match unistd::mkfifo(&r1_fifo, stat::Mode::S_IRWXU) {
         Ok(_) => {
             info!("created {:?}", r1_fifo);
-            assert!(std::path::Path::new(&r1_fifo).exists()); 
-        },
+            assert!(std::path::Path::new(&r1_fifo).exists());
+        }
         Err(err) => bail!("Error creating read 1 fifo: {}", err),
     }
     // create new fifo and give read, write and execute rights to the owner
     match unistd::mkfifo(&r2_fifo, stat::Mode::S_IRWXU) {
-        Ok(_) => { 
-            info!("created {:?}", r2_fifo); 
+        Ok(_) => {
+            info!("created {:?}", r2_fifo);
             assert!(std::path::Path::new(&r2_fifo).exists());
-        },
+        }
         Err(err) => bail!("Error creating read 2 fifo: {}", err),
     }
 
@@ -467,7 +467,10 @@ pub fn xform_read_pairs_to_fifo(
     let r2_fifo_clone = r2_fifo.clone();
 
     let join_handle: thread::JoinHandle<Result<()>> = thread::spawn(move || {
-        let local_tmpdir = tmp_dir;
+        // this is unused, but the move is made so that the tmp_dir
+        // lifetime is extended and the directory stays around for
+        // the duration of this thread.
+        let _local_tmpdir = tmp_dir;
         xform_read_pairs_to_file(geo_re, r1, r2, r1_fifo_clone, r2_fifo_clone)
     });
 

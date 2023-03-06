@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -8,7 +6,6 @@ use seq_geom_parser::FragmentGeomDesc; // PiscemGeomDesc, SalmonSeparateGeomDesc
 use seq_geom_xform::FragmentGeomDescExt;
 
 use anyhow::Result;
-use needletail::{parse_fastx_file, Sequence};
 
 use tracing::info;
 use tracing_subscriber::filter::LevelFilter;
@@ -51,7 +48,7 @@ fn process_reads(args: Args) -> Result<()> {
                 geo_re.r1_re, geo_re.r2_re
             );
 
-            let simp_desc = geo_re.get_simplified_piscem_description_string();
+            let simp_desc = geo_re.get_simplified_description_string();
             info!(
                 "description the simplified version of this geometry is {}",
                 simp_desc
