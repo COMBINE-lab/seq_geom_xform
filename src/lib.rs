@@ -1,3 +1,9 @@
+//! # seq_geom_xform
+//!
+//! `seq_geom_xform` is a crate for transforming complex fragment library geometries 
+//! from single-cell sequencing data into simple fragment library geometries.
+
+
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
