@@ -442,7 +442,7 @@ pub fn xform_read_pairs_to_fifo(
         );
     }
 
-    let tmp_dir = tempdir().unwrap();
+    let tmp_dir = tempdir()?;
     let r1_fifo = tmp_dir.path().join("r1.pipe");
     let r2_fifo = tmp_dir.path().join("r2.pipe");
 
@@ -463,15 +463,27 @@ pub fn xform_read_pairs_to_fifo(
         Err(err) => bail!("Error creating read 2 fifo: {}", err),
     }
 
+    // we clone this here because we want to move these into 
+    // the thread that will do the transformation but we need 
+    // to retain a copy to pass to the FifoXFormData that we 
+    // will return.
     let r1_fifo_clone = r1_fifo.clone();
     let r2_fifo_clone = r2_fifo.clone();
 
     let join_handle: thread::JoinHandle<Result<()>> = thread::spawn(move || {
-        // this is unused, but the move is made so that the tmp_dir
-        // lifetime is extended and the directory stays around for
-        // the duration of this thread.
-        let _local_tmpdir = tmp_dir;
-        xform_read_pairs_to_file(geo_re, r1, r2, r1_fifo_clone, r2_fifo_clone)
+        xform_read_pairs_to_file(geo_re, r1, r2, r1_fifo_clone, r2_fifo_clone)?;
+        // Explicitly check for and propagate any errors encountered in the 
+        // closing and deleting of the temporary directory.  The directory 
+        // will be deleted when the handle goes out of scope, but without 
+        // calling this method, any encountered errors will be silently 
+        // ignored.  
+        // see: https://docs.rs/tempfile/latest/tempfile/struct.TempDir.html#method.close
+        match tmp_dir.close() {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                bail!("When closing (deleting) the temp directory, the following error was encountered {:?}", e);
+            }
+        }
     });
 
     Ok(FifoXFormData {
