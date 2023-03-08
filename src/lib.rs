@@ -1,8 +1,7 @@
 //! # seq_geom_xform
 //!
-//! `seq_geom_xform` is a crate for transforming complex fragment library geometries 
+//! `seq_geom_xform` is a crate for transforming complex fragment library geometries
 //! from single-cell sequencing data into simple fragment library geometries.
-
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -83,9 +82,9 @@ fn parse_single_read(
                     // if we captured some variable length piece of geometry
                     // then we have to apply the appropriate padding so that
                     // we can pass the result to a non-variable length parser.
-                    Some(GeomPiece::Barcode(GeomLen::BoundedRange(_l, h)))
-                    | Some(GeomPiece::Umi(GeomLen::BoundedRange(_l, h)))
-                    | Some(GeomPiece::ReadSeq(GeomLen::BoundedRange(_l, h))) => {
+                    Some(GeomPiece::Barcode(GeomLen::LenRange(_l, h)))
+                    | Some(GeomPiece::Umi(GeomLen::LenRange(_l, h)))
+                    | Some(GeomPiece::ReadSeq(GeomLen::LenRange(_l, h))) => {
                         let captured_len = g.1 - g.0;
                         outstr.push_str(VAR_LEN_BC_PADDING[(*h as usize) - (captured_len)]);
                     }
@@ -105,32 +104,32 @@ fn get_simplified_piscem_string(geo_pieces: &[GeomPiece]) -> String {
     let mut rep = String::new();
     for gp in geo_pieces {
         match gp {
-            GeomPiece::Discard(GeomLen::Bounded(x)) => {
+            GeomPiece::Discard(GeomLen::FixedLen(x)) => {
                 rep += &format!("x[{}]", x);
             }
-            GeomPiece::Barcode(GeomLen::Bounded(x)) => {
+            GeomPiece::Barcode(GeomLen::FixedLen(x)) => {
                 rep += &format!("b[{}]", x);
             }
-            GeomPiece::Umi(GeomLen::Bounded(x)) => {
+            GeomPiece::Umi(GeomLen::FixedLen(x)) => {
                 rep += &format!("u[{}]", x);
             }
-            GeomPiece::ReadSeq(GeomLen::Bounded(x)) => {
+            GeomPiece::ReadSeq(GeomLen::FixedLen(x)) => {
                 rep += &format!("r[{}]", x);
             }
             // NOTE: the + 1 in the rules below assumes we will
             // only ever have variable width of geometry pieces
             // of at most 4 bases. If we need to every move
             // beyond that, this code will have to be generalized.
-            GeomPiece::Discard(GeomLen::BoundedRange(_l, h)) => {
+            GeomPiece::Discard(GeomLen::LenRange(_l, h)) => {
                 rep += &format!("x[{}]", h + 1);
             }
-            GeomPiece::Barcode(GeomLen::BoundedRange(_l, h)) => {
+            GeomPiece::Barcode(GeomLen::LenRange(_l, h)) => {
                 rep += &format!("b[{}]", h + 1);
             }
-            GeomPiece::Umi(GeomLen::BoundedRange(_l, h)) => {
+            GeomPiece::Umi(GeomLen::LenRange(_l, h)) => {
                 rep += &format!("u[{}]", h + 1);
             }
-            GeomPiece::ReadSeq(GeomLen::BoundedRange(_l, h)) => {
+            GeomPiece::ReadSeq(GeomLen::LenRange(_l, h)) => {
                 rep += &format!("r[{}]", h + 1);
             }
             GeomPiece::Discard(GeomLen::Unbounded) => {
@@ -159,15 +158,17 @@ fn get_simplified_geo(gp: &GeomPiece) -> GeomPiece {
         // only ever have variable width of geometry pieces
         // of at most 4 bases. If we need to every move
         // beyond that, this code will have to be generalized.
-        GeomPiece::Discard(GeomLen::BoundedRange(_l, h)) => {
-            GeomPiece::Discard(GeomLen::Bounded(h + 1))
+        GeomPiece::Discard(GeomLen::LenRange(_l, h)) => {
+            GeomPiece::Discard(GeomLen::FixedLen(h + 1))
         }
-        GeomPiece::Barcode(GeomLen::BoundedRange(_l, h)) => {
-            GeomPiece::Barcode(GeomLen::Bounded(h + 1))
+        GeomPiece::Barcode(GeomLen::LenRange(_l, h)) => {
+            GeomPiece::Barcode(GeomLen::FixedLen(h + 1))
         }
-        GeomPiece::Umi(GeomLen::BoundedRange(_l, h)) => GeomPiece::Umi(GeomLen::Bounded(h + 1)),
-        GeomPiece::ReadSeq(GeomLen::BoundedRange(_l, h)) => {
-            GeomPiece::ReadSeq(GeomLen::Bounded(h + 1))
+        GeomPiece::Umi(GeomLen::LenRange(_lower_bound, h)) => {
+            GeomPiece::Umi(GeomLen::FixedLen(h + 1))
+        }
+        GeomPiece::ReadSeq(GeomLen::LenRange(_l, h)) => {
+            GeomPiece::ReadSeq(GeomLen::FixedLen(h + 1))
         }
         _ => gp.clone(),
     }
@@ -234,24 +235,24 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> Result<(String, Option<GeomPiec
     let mut geo = None;
     match gp {
         // single lengths
-        GeomPiece::Discard(GeomLen::Bounded(x)) => {
+        GeomPiece::Discard(GeomLen::FixedLen(x)) => {
             rep += &format!(r#"[ACGTN]{{{}}}"#, x);
             // don't need to capture
         }
-        GeomPiece::Barcode(GeomLen::Bounded(x)) => {
+        GeomPiece::Barcode(GeomLen::FixedLen(x)) => {
             rep += &format!(r#"([ACGTN]{{{}}})"#, x);
             geo = Some(gp.clone());
         }
-        GeomPiece::Umi(GeomLen::Bounded(x)) => {
+        GeomPiece::Umi(GeomLen::FixedLen(x)) => {
             rep += &format!(r#"([ACGTN]{{{}}})"#, x);
             geo = Some(gp.clone());
         }
-        GeomPiece::ReadSeq(GeomLen::Bounded(x)) => {
+        GeomPiece::ReadSeq(GeomLen::FixedLen(x)) => {
             rep += &format!(r#"([ACGTN]{{{}}})"#, x);
             geo = Some(gp.clone());
         }
         // length ranges
-        GeomPiece::Discard(GeomLen::BoundedRange(l, h)) => {
+        GeomPiece::Discard(GeomLen::LenRange(l, h)) => {
             if h - l > BOUNDED_RANGE_LIMIT {
                 bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
                     BOUNDED_RANGE_LIMIT, &gp, h-l);
@@ -259,7 +260,7 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> Result<(String, Option<GeomPiec
             rep += &format!(r#"[ACGTN]{{{},{}}}"#, l, h);
             // don't need to capture
         }
-        GeomPiece::Barcode(GeomLen::BoundedRange(l, h)) => {
+        GeomPiece::Barcode(GeomLen::LenRange(l, h)) => {
             if h - l > BOUNDED_RANGE_LIMIT {
                 bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
                     BOUNDED_RANGE_LIMIT, &gp, h-l);
@@ -267,7 +268,7 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> Result<(String, Option<GeomPiec
             rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
             geo = Some(gp.clone());
         }
-        GeomPiece::Umi(GeomLen::BoundedRange(l, h)) => {
+        GeomPiece::Umi(GeomLen::LenRange(l, h)) => {
             if h - l > BOUNDED_RANGE_LIMIT {
                 bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
                     BOUNDED_RANGE_LIMIT, &gp, h-l);
@@ -275,7 +276,7 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> Result<(String, Option<GeomPiec
             rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
             geo = Some(gp.clone());
         }
-        GeomPiece::ReadSeq(GeomLen::BoundedRange(l, h)) => {
+        GeomPiece::ReadSeq(GeomLen::LenRange(l, h)) => {
             if h - l > BOUNDED_RANGE_LIMIT {
                 bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
                     BOUNDED_RANGE_LIMIT, &gp, h-l);
@@ -323,12 +324,12 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
 
         // This seems to lead to a slight performance improvement, but consider if
         // we really want to do this.  This checks if the last GeomPiece in the
-        // current description is bounded or not.  If so (i.e. if it is bounded), then
-        // we add an unbounded `Discard` GeomPiece to the end followed by the
+        // current description is of fixed length or not.  If so (i.e. if it is a fixed
+        // length piece), then we add an unbounded `Discard` GeomPiece to the end followed by the
         // end of string anchor.  This anchoring of the regex (seemingly) makes matching a
         // little bit faster.
         if let Some(geo_piece) = &self.read1_desc.last() {
-            if geo_piece.is_bounded() {
+            if geo_piece.is_fixed_len() {
                 let (str_piece, _geo_len) =
                     geom_piece_as_regex_string(&GeomPiece::Discard(GeomLen::Unbounded))?;
                 r1_re_str += &str_piece;
@@ -348,12 +349,13 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
 
         // This seems to lead to a slight performance improvement, but consider if
         // we really want to do this.  This checks if the last GeomPiece in the
-        // current description is bounded or not.  If so (i.e. if it is bounded), then
-        // we add an unbounded `Discard` GeomPiece to the end followed by the
+        // current description is of fixed length or not.  If so (i.e. if it is a fixed
+        // length piece), then we add an unbounded `Discard` GeomPiece to the end followed by the
         // end of string anchor.  This anchoring of the regex (seemingly) makes matching a
         // little bit faster.
+
         if let Some(geo_piece) = &self.read2_desc.last() {
-            if geo_piece.is_bounded() {
+            if geo_piece.is_fixed_len() {
                 let (str_piece, _geo_len) =
                     geom_piece_as_regex_string(&GeomPiece::Discard(GeomLen::Unbounded))?;
                 r2_re_str += &str_piece;
@@ -469,20 +471,20 @@ pub fn xform_read_pairs_to_fifo(
         Err(err) => bail!("Error creating read 2 fifo: {}", err),
     }
 
-    // we clone this here because we want to move these into 
-    // the thread that will do the transformation but we need 
-    // to retain a copy to pass to the FifoXFormData that we 
+    // we clone this here because we want to move these into
+    // the thread that will do the transformation but we need
+    // to retain a copy to pass to the FifoXFormData that we
     // will return.
     let r1_fifo_clone = r1_fifo.clone();
     let r2_fifo_clone = r2_fifo.clone();
 
     let join_handle: thread::JoinHandle<Result<()>> = thread::spawn(move || {
         xform_read_pairs_to_file(geo_re, r1, r2, r1_fifo_clone, r2_fifo_clone)?;
-        // Explicitly check for and propagate any errors encountered in the 
-        // closing and deleting of the temporary directory.  The directory 
-        // will be deleted when the handle goes out of scope, but without 
-        // calling this method, any encountered errors will be silently 
-        // ignored.  
+        // Explicitly check for and propagate any errors encountered in the
+        // closing and deleting of the temporary directory.  The directory
+        // will be deleted when the handle goes out of scope, but without
+        // calling this method, any encountered errors will be silently
+        // ignored.
         // see: https://docs.rs/tempfile/latest/tempfile/struct.TempDir.html#method.close
         match tmp_dir.close() {
             Ok(_) => Ok(()),
