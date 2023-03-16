@@ -23,9 +23,17 @@ use tempfile::tempdir;
 pub struct FragmentRegexDesc {
     pub r1_cginfo: Vec<GeomPiece>,
     pub r2_cginfo: Vec<GeomPiece>,
+    /// The regular expression expected to match read 1
     pub r1_re: Regex,
+    /// The regular expression expected to match read 1
     pub r2_re: Regex,
+    /// The CaptureLocations to store capture group information
+    /// for read 1. This is re-used between parsing calls to
+    /// increase performance.
     r1_clocs: CaptureLocations,
+    /// The CaptureLocations to store capture group information
+    /// for read 2. This is re-used between parsing calls to
+    /// increase performance.
     r2_clocs: CaptureLocations,
 }
 
@@ -54,7 +62,12 @@ impl Default for SeqPair {
     }
 }
 
+/// The maximum width for a `RangedLength` that can be handled with our
+/// current padding scheme.  That is, if we have a piece of geometry like
+/// Umi(BoundedRange(x, y)), we must have that y-x <= 4.
 const BOUNDED_RANGE_LIMIT: u32 = 4;
+/// The padding that we will append to each possible length in a variable
+/// length geometry piece.
 const VAR_LEN_BC_PADDING: &[&str] = &["A", "AC", "AAG", "AAAT"];
 
 /// Builds the parsed output string `s` given the `CaptureLocations` `clocs`,
@@ -74,6 +87,7 @@ fn parse_single_read(
         outstr.push_str(r);
     } else {
         // otherwise, process each capture group
+
         for cl in 1..clocs.len() {
             if let Some(g) = clocs.get(cl) {
                 outstr.push_str(r.get(g.0..g.1).unwrap());
@@ -182,8 +196,14 @@ impl FragmentRegexDesc {
     /// the contents of `sp`.
     pub fn parse_into(&mut self, r1: &[u8], r2: &[u8], sp: &mut SeqPair) -> bool {
         sp.clear();
-        let _m1 = self.r1_re.captures_read(&mut self.r1_clocs, r1);
-        let _m2 = self.r2_re.captures_read(&mut self.r2_clocs, r2);
+        let m1 = self.r1_re.captures_read(&mut self.r1_clocs, r1);
+        let m2 = self.r2_re.captures_read(&mut self.r2_clocs, r2);
+
+        // if the overall match was not obtained for
+        // both of the reads, then don't attempt extraction.
+        if m1.or(m2).is_none() {
+            return false;
+        }
 
         let s1 = unsafe { std::str::from_utf8_unchecked(r1) };
         let s2 = unsafe { std::str::from_utf8_unchecked(r2) };
