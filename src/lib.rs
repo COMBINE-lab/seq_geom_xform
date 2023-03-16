@@ -178,9 +178,7 @@ fn get_simplified_geo(gp: &GeomPiece) -> GeomPiece {
         GeomPiece::Barcode(GeomLen::LenRange(_l, h)) => {
             GeomPiece::Barcode(GeomLen::FixedLen(h + 1))
         }
-        GeomPiece::Umi(GeomLen::LenRange(_lower_bound, h)) => {
-            GeomPiece::Umi(GeomLen::FixedLen(h + 1))
-        }
+        GeomPiece::Umi(GeomLen::LenRange(_l, h)) => GeomPiece::Umi(GeomLen::FixedLen(h + 1)),
         GeomPiece::ReadSeq(GeomLen::LenRange(_l, h)) => {
             GeomPiece::ReadSeq(GeomLen::FixedLen(h + 1))
         }
@@ -247,6 +245,10 @@ impl FragmentRegexDesc {
 
 /// Extension methods for FragmentGeomDesc
 pub trait FragmentGeomDescExt {
+    /// Return a `FragmentRegexDesc` corresponding to the current
+    /// `FragmentGeomDesc`.  This function returns a `Result` that is
+    /// `Ok(FragmentRegexDesc)` if the `FragmentRegexDesc` could be
+    /// succesfully created and an `Err(anyhow::Error)` otherwise.
     fn as_regex(&self) -> Result<FragmentRegexDesc, anyhow::Error>;
 }
 
@@ -256,19 +258,13 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> Result<(String, Option<GeomPiec
     match gp {
         // single lengths
         GeomPiece::Discard(GeomLen::FixedLen(x)) => {
-            rep += &format!(r#"[ACGTN]{{{}}}"#, x);
+            rep.push_str(&format!(r#"[ACGTN]{{{}}}"#, x));
             // don't need to capture
         }
-        GeomPiece::Barcode(GeomLen::FixedLen(x)) => {
-            rep += &format!(r#"([ACGTN]{{{}}})"#, x);
-            geo = Some(gp.clone());
-        }
-        GeomPiece::Umi(GeomLen::FixedLen(x)) => {
-            rep += &format!(r#"([ACGTN]{{{}}})"#, x);
-            geo = Some(gp.clone());
-        }
-        GeomPiece::ReadSeq(GeomLen::FixedLen(x)) => {
-            rep += &format!(r#"([ACGTN]{{{}}})"#, x);
+        GeomPiece::Barcode(GeomLen::FixedLen(x))
+        | GeomPiece::Umi(GeomLen::FixedLen(x))
+        | GeomPiece::ReadSeq(GeomLen::FixedLen(x)) => {
+            rep.push_str(&format!(r#"([ACGTN]{{{}}})"#, x));
             geo = Some(gp.clone());
         }
         // length ranges
@@ -277,52 +273,32 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> Result<(String, Option<GeomPiec
                 bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
                     BOUNDED_RANGE_LIMIT, &gp, h-l);
             }
-            rep += &format!(r#"[ACGTN]{{{},{}}}"#, l, h);
+            rep.push_str(&format!(r#"[ACGTN]{{{},{}}}"#, l, h));
             // don't need to capture
         }
-        GeomPiece::Barcode(GeomLen::LenRange(l, h)) => {
+        GeomPiece::Barcode(GeomLen::LenRange(l, h))
+        | GeomPiece::Umi(GeomLen::LenRange(l, h))
+        | GeomPiece::ReadSeq(GeomLen::LenRange(l, h)) => {
             if h - l > BOUNDED_RANGE_LIMIT {
                 bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
                     BOUNDED_RANGE_LIMIT, &gp, h-l);
             }
-            rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
-            geo = Some(gp.clone());
-        }
-        GeomPiece::Umi(GeomLen::LenRange(l, h)) => {
-            if h - l > BOUNDED_RANGE_LIMIT {
-                bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
-                    BOUNDED_RANGE_LIMIT, &gp, h-l);
-            }
-            rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
-            geo = Some(gp.clone());
-        }
-        GeomPiece::ReadSeq(GeomLen::LenRange(l, h)) => {
-            if h - l > BOUNDED_RANGE_LIMIT {
-                bail!("Bounded range can have variable width at most {} but the current element {:?} has variable width {}.",
-                    BOUNDED_RANGE_LIMIT, &gp, h-l);
-            }
-            rep += &format!(r#"([ACGTN]{{{},{}}})"#, l, h);
+            rep.push_str(&format!(r#"([ACGTN]{{{},{}}})"#, l, h));
             geo = Some(gp.clone());
         }
         // fixed sequence
         GeomPiece::Fixed(NucStr::Seq(s)) => {
             // no caputre group because no need to capture this
             // right now
-            rep += s;
+            rep.push_str(s);
         }
         // unbounded pieces
         GeomPiece::Discard(GeomLen::Unbounded) => {
             rep += r#"[ACGTN]*"#;
         }
-        GeomPiece::Barcode(GeomLen::Unbounded) => {
-            rep += r#"([ACGTN]*)"#;
-            geo = Some(gp.clone());
-        }
-        GeomPiece::Umi(GeomLen::Unbounded) => {
-            rep += r#"([ACGTN]*)"#;
-            geo = Some(gp.clone());
-        }
-        GeomPiece::ReadSeq(GeomLen::Unbounded) => {
+        GeomPiece::Barcode(GeomLen::Unbounded)
+        | GeomPiece::Umi(GeomLen::Unbounded)
+        | GeomPiece::ReadSeq(GeomLen::Unbounded) => {
             rep += r#"([ACGTN]*)"#;
             geo = Some(gp.clone());
         }
@@ -331,12 +307,16 @@ fn geom_piece_as_regex_string(gp: &GeomPiece) -> Result<(String, Option<GeomPiec
 }
 
 impl FragmentGeomDescExt for FragmentGeomDesc {
+    /// Return a `FragmentRegexDesc` corresponding to the current
+    /// `FragmentGeomDesc`.  This function returns a `Result` that is
+    /// `Ok(FragmentRegexDesc)` if the `FragmentRegexDesc` could be
+    /// succesfully created and an `Err(anyhow::Error)` otherwise.
     fn as_regex(&self) -> Result<FragmentRegexDesc, anyhow::Error> {
         let mut r1_re_str = String::from("^");
         let mut r1_cginfo = Vec::<GeomPiece>::new();
         for geo_piece in &self.read1_desc {
             let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece)?;
-            r1_re_str += &str_piece;
+            r1_re_str.push_str(&str_piece);
             if let Some(elem) = geo_len {
                 r1_cginfo.push(elem);
             }
@@ -352,7 +332,7 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
             if geo_piece.is_fixed_len() {
                 let (str_piece, _geo_len) =
                     geom_piece_as_regex_string(&GeomPiece::Discard(GeomLen::Unbounded))?;
-                r1_re_str += &str_piece;
+                r1_re_str.push_str(&str_piece);
             }
         }
         r1_re_str.push('$');
@@ -361,7 +341,7 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
         let mut r2_cginfo = Vec::<GeomPiece>::new();
         for geo_piece in &self.read2_desc {
             let (str_piece, geo_len) = geom_piece_as_regex_string(geo_piece)?;
-            r2_re_str += &str_piece;
+            r2_re_str.push_str(&str_piece);
             if let Some(elem) = geo_len {
                 r2_cginfo.push(elem);
             }
@@ -373,12 +353,11 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
         // length piece), then we add an unbounded `Discard` GeomPiece to the end followed by the
         // end of string anchor.  This anchoring of the regex (seemingly) makes matching a
         // little bit faster.
-
         if let Some(geo_piece) = &self.read2_desc.last() {
             if geo_piece.is_fixed_len() {
                 let (str_piece, _geo_len) =
                     geom_piece_as_regex_string(&GeomPiece::Discard(GeomLen::Unbounded))?;
-                r2_re_str += &str_piece;
+                r2_re_str.push_str(&str_piece);
             }
         }
         r2_re_str.push('$');
@@ -412,10 +391,16 @@ pub struct FifoXFormData {
     pub join_handle: thread::JoinHandle<Result<()>>,
 }
 
+/// Given input file paths (possibly multiple sets of files) in `r1` and `r2`,
+/// read sequence records from these files and transform them in accordance with
+/// the `FragmentRegexDesc` provided as `geo_re`.  The transformed records are then
+/// written out to `r1_ofile` and `r2_ofile`. Currently all output is written in `FASTA`
+/// format, so any quality lines or comment lines (if the input is `FASTQ`) will be
+/// dropped.
 pub fn xform_read_pairs_to_file(
     mut geo_re: FragmentRegexDesc,
-    r1: Vec<PathBuf>,
-    r2: Vec<PathBuf>,
+    r1: &[PathBuf],
+    r2: &[PathBuf],
     r1_ofile: PathBuf,
     r2_ofile: PathBuf,
 ) -> Result<()> {
@@ -499,7 +484,7 @@ pub fn xform_read_pairs_to_fifo(
     let r2_fifo_clone = r2_fifo.clone();
 
     let join_handle: thread::JoinHandle<Result<()>> = thread::spawn(move || {
-        xform_read_pairs_to_file(geo_re, r1, r2, r1_fifo_clone, r2_fifo_clone)?;
+        xform_read_pairs_to_file(geo_re, &r1, &r2, r1_fifo_clone, r2_fifo_clone)?;
         // Explicitly check for and propagate any errors encountered in the
         // closing and deleting of the temporary directory.  The directory
         // will be deleted when the handle goes out of scope, but without

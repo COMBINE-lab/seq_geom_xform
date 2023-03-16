@@ -71,7 +71,11 @@ fn process_reads(args: Args) -> Result<()> {
             */
 
             seq_geom_xform::xform_read_pairs_to_file(
-                geo_re, args.read1, args.read2, args.out1, args.out2,
+                geo_re,
+                &args.read1,
+                &args.read2,
+                args.out1,
+                args.out2,
             )?;
             Ok(())
         }
