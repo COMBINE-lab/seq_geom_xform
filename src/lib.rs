@@ -37,6 +37,7 @@ pub struct FragmentRegexDesc {
     r2_clocs: CaptureLocations,
 }
 
+#[derive(Debug)]
 pub struct SeqPair {
     pub s1: String,
     pub s2: String,
@@ -388,7 +389,30 @@ impl FragmentGeomDescExt for FragmentGeomDesc {
 pub struct FifoXFormData {
     pub r1_fifo: PathBuf,
     pub r2_fifo: PathBuf,
-    pub join_handle: thread::JoinHandle<Result<()>>,
+    pub join_handle: thread::JoinHandle<Result<XformStats>>,
+}
+
+/// This struct holds some basic statistics about
+/// the transformation of a stream of reads.
+#[derive(Debug)]
+pub struct XformStats {
+    pub total_fragments: u64,
+    pub failed_parsing: u64,
+}
+
+impl XformStats {
+    pub fn new() -> Self {
+        Self {
+            total_fragments: 0u64,
+            failed_parsing: 0u64,
+        }
+    }
+}
+
+impl Default for XformStats {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Given input file paths (possibly multiple sets of files) in `r1` and `r2`,
@@ -403,19 +427,21 @@ pub fn xform_read_pairs_to_file(
     r2: &[PathBuf],
     r1_ofile: PathBuf,
     r2_ofile: PathBuf,
-) -> Result<()> {
+) -> Result<XformStats> {
     let f1 = File::create(r1_ofile).expect("Unable to open read 1 file");
     let f2 = File::create(r2_ofile).expect("Unable to open read 2 file");
 
     let mut stream1 = BufWriter::new(f1);
     let mut stream2 = BufWriter::new(f2);
 
+    let mut xform_stats = XformStats::new();
     let mut parsed_records = SeqPair::new();
     for (filename1, filename2) in r1.iter().zip(r2.iter()) {
         let mut reader = parse_fastx_file(filename1).expect("valid path/file");
         let mut reader2 = parse_fastx_file(filename2).expect("valid path/file");
 
         while let (Some(record), Some(record2)) = (reader.next(), reader2.next()) {
+            xform_stats.total_fragments += 1;
             let seqrec = record.expect("invalid record");
             let seqrec2 = record2.expect("invalid record");
 
@@ -436,10 +462,12 @@ pub fn xform_read_pairs_to_file(
                     )
                     .expect("couldn't write output to file 2");
                 }
+            } else {
+                xform_stats.failed_parsing += 1;
             }
         }
     }
-    Ok(())
+    Ok(xform_stats)
 }
 
 /// Given input file paths (possibly multiple sets of files) in `r1` and `r2`,
@@ -494,8 +522,8 @@ pub fn xform_read_pairs_to_fifo(
     let r1_fifo_clone = r1_fifo.clone();
     let r2_fifo_clone = r2_fifo.clone();
 
-    let join_handle: thread::JoinHandle<Result<()>> = thread::spawn(move || {
-        xform_read_pairs_to_file(geo_re, &r1, &r2, r1_fifo_clone, r2_fifo_clone)?;
+    let join_handle: thread::JoinHandle<Result<XformStats>> = thread::spawn(move || {
+        let xform_stats = xform_read_pairs_to_file(geo_re, &r1, &r2, r1_fifo_clone, r2_fifo_clone)?;
         // Explicitly check for and propagate any errors encountered in the
         // closing and deleting of the temporary directory.  The directory
         // will be deleted when the handle goes out of scope, but without
@@ -503,7 +531,7 @@ pub fn xform_read_pairs_to_fifo(
         // ignored.
         // see: https://docs.rs/tempfile/latest/tempfile/struct.TempDir.html#method.close
         match tmp_dir.close() {
-            Ok(_) => Ok(()),
+            Ok(_) => Ok(xform_stats),
             Err(e) => {
                 bail!("When closing (deleting) the temp directory, the following error was encountered {:?}", e);
             }
@@ -521,9 +549,75 @@ pub fn xform_read_pairs_to_fifo(
 mod tests {
     use super::*;
 
+    /// This test checks that technical reads from
+    /// sciseq v3 can be properly parsed.  This is a set
+    /// of the first few reads from SRR7827207.  The tuple
+    /// in each instance holds the read itself, whether or not
+    /// it whould parse succesfully (those not containing the
+    /// anchor should not parse), and the expected length of the
+    /// variable-length barcode piece before the anchor.
+    ///
+    /// The test checks that the reads that should parse do, that
+    /// those that should not don't, and that the appropriate
+    /// padding characters are added to each variable-length
+    /// piece based on it's length.
     #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+    fn sciseq3_transforms() {
+        let test_technical_reads = vec![
+            ("TNGCGCATTCAGAGCGCCACTTTCGGAAGATATTTT", true, 9),
+            ("TNTATACCTTCAGAGCGTGAGGATGTCCTAGAGGTT", true, 10),
+            ("AGAGATGAATCAGAGCTGTGCCGGGCTAACCTCATT", true, 10),
+            ("TGAACGCGTTTTTTTTTTTTTTTTTTTTTTTTTTTT", false, 0),
+            ("AAACTCCAATCAGAGCTCCGAGACAACCATTGGATT", true, 10),
+            ("ACGAGGTTTCTGAGCCGATAAAGTGATGGCCTTTTT", false, 0),
+            ("GCTCTTAGTCAGAGCCGTTTTGGGCGACGCCTTTTT", true, 9),
+            ("TCCGTATGTCAGAGCGACTGATGTTATAGCAGATTT", true, 9),
+            ("TCTCTCCATCAGAGCAAAAGATTCATTCAATCATTC", true, 9),
+            ("AGAACTCCTCTGAGCAATGTCGCTTATTCTGAGTTT", false, 0),
+            ("AAGTATTGGTCAGAGCTACGCATTACGCAACTCCTT", true, 10),
+            ("TGTCCTTATTCAGAGCCCATTTACGCCACGCAGCTC", true, 10),
+            ("GCGCTCAATCAGAGCCGGTGGAAAGACTCAAGCCCT", true, 9),
+            ("TTCTTAACCTCAGAGCTGACTAGTACTAGAGAGTTT", true, 10),
+            ("TCCTCGAGTCAGAGCGTCCTGGCTTAATTATTGTTT", true, 9),
+            ("AACTGGCATCAGAGCCCTCTAATGATCGCTTCTTTT", true, 9),
+            ("TATGCGATTTCAGAGCGCGGGGGGCCGAGAATCCTT", true, 10),
+            ("TAGTTACCTTCAGAGCGGTTTACACATCCGACTATT", true, 10),
+            ("CAAGCAACTCAGAGCTTTTTCTTTCGCGGTTGGTTT", true, 9),
+            ("ACCGTAGCTCAGAGCGGCCAGTTACGCAACTCCTTT", true, 9),
+            ("CCAAGGATTCAGAGCGGCGCGCCATCCATGACTTTT", true, 9),
+            ("TTACTAAGTCAGAGCAGAGGGACGCCAGGATCTTTT", true, 9),
+            ("GTAGCGATTCAGAGCAGGCGTGATTATAGCAGATTT", true, 9),
+            ("AGCAACGATCTGAGCATATTCAGACCGCGCAACCAT", false, 0),
+            ("ATTAATGCCTCAGAGCACGGTACAGATCTTACGCTT", true, 10),
+        ];
+
+        let geo = FragmentGeomDesc::try_from("1{b[9-10]f[CAGAGC]u[8]b[10]}2{r:}").unwrap();
+
+        let mut sp = SeqPair::new();
+        match geo.as_regex() {
+            Ok(mut geo_re) => {
+                for (tr, should_parse, pref_len) in &test_technical_reads {
+                    let r = geo_re.parse_into(tr.as_bytes(), tr.as_bytes(), &mut sp);
+                    assert_eq!(r, *should_parse);
+                    if r {
+                        dbg!("tr = {}, sp = {:?}", &tr, &sp);
+                        match pref_len {
+                            9 => {
+                                assert_eq!(&sp.s1[9..11], VAR_LEN_BC_PADDING[1]);
+                            }
+                            10 => {
+                                assert_eq!(&sp.s1[10..11], VAR_LEN_BC_PADDING[0]);
+                            }
+                            _ => {
+                                panic!("shouldn't happen");
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                panic!("{:?} : couldn't parse valid geometry!", e);
+            }
+        }
     }
 }
