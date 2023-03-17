@@ -64,6 +64,7 @@ fn process_reads(args: Args) -> Result<()> {
                 args.out2,
             )?;
 
+            info!("fragment transformation statistics\n{}", &xform_stats);
             let total = xform_stats.total_fragments;
             let failed = xform_stats.failed_parsing;
             info!(
