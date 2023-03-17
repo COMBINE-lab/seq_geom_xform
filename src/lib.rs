@@ -442,6 +442,17 @@ pub fn xform_read_pairs_to_file(
     Ok(())
 }
 
+/// Given input file paths (possibly multiple sets of files) in `r1` and `r2`,
+/// and `FragmentRegexDesc` `geo_re`, this function returns a `Result<FifoXFormData>`.
+/// If succesful the `Ok(FifoXFormData)` will contain the paths to 2 fifos (1 for each
+/// list of input read files) as well as a `thread::JoinHandle`.  The `thread::JoinHandle`
+/// will be for a spawned thread that will read sequence records from the files in `r1` and `r2`
+/// and transform these reads in accordance with the `FragmentRegexDesc` provided as `geo_re`.  
+/// The transformed records are then written out to the fifos given in the `FifoXFormData` struct.
+/// Currently, all output is written in `FASTA` format, so any quality lines or comment lines
+/// (if the input is `FASTQ`) will be dropped.  If an error occurs up to the creation of the
+/// spawned thread, then this function returns an `Err(anyhow::Error)`.  The spawned thread
+/// itself returns a `Result<()>`.
 pub fn xform_read_pairs_to_fifo(
     geo_re: FragmentRegexDesc,
     r1: Vec<PathBuf>,
