@@ -3,6 +3,7 @@
 //! `seq_geom_xform` is a crate for transforming complex fragment library geometries
 //! from single-cell sequencing data into simple fragment library geometries.
 
+use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
@@ -13,6 +14,7 @@ use regex::bytes::{CaptureLocations, Regex};
 use seq_geom_parser::{FragmentGeomDesc, GeomLen, GeomPiece, NucStr};
 
 use needletail::{parse_fastx_file, Sequence};
+use thousands::Separable;
 use tracing::info;
 
 use nix::sys::stat;
@@ -401,6 +403,7 @@ pub struct XformStats {
 }
 
 impl XformStats {
+    /// Create a new (empty) XformStats
     pub fn new() -> Self {
         Self {
             total_fragments: 0u64,
@@ -410,8 +413,31 @@ impl XformStats {
 }
 
 impl Default for XformStats {
+    /// Create a default (empty) XformStats
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Display for XformStats {
+    /// Formats and returns the canonical string representation of each type of
+    /// `GeomPiece`.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            r#"XformStats {{ 
+    total fragments: {},
+    fragments failing parsing: {},
+    percentage successfully transformed fragments: {:.2},
+}}"#,
+            self.total_fragments.separate_with_commas(),
+            self.failed_parsing.separate_with_commas(),
+            if self.total_fragments > 0 {
+                1_f64 - ((self.failed_parsing as f64) / (self.total_fragments as f64))
+            } else {
+                1_f64
+            } * 100_f64
+        )
     }
 }
 
