@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::time::Instant;
 
 use clap::Parser;
 
@@ -43,6 +44,7 @@ fn process_reads(args: Args) -> Result<()> {
 
     match geo.as_regex() {
         Ok(geo_re) => {
+            let start = Instant::now();
             info!(
                 "geometry as regex = Read1 : {:?}, Read2 : {:?}",
                 geo_re.r1_re, geo_re.r2_re
@@ -54,25 +56,24 @@ fn process_reads(args: Args) -> Result<()> {
                 simp_desc
             );
 
-            /*
-            let simp_desc = geo_re.get_simplified_geo_desc();
-
-            let pd = PiscemGeomDesc::from_geom_pieces(&simp_desc.read1_desc, &simp_desc.read2_desc);
-            info!(
-                "piscem description of simplified geometry {:?}, {:?}",
-                &pd.read1_desc, &pd.read2_desc
-            );
-
-            let sd = SalmonSeparateGeomDesc::from_geom_pieces(
-                &simp_desc.read1_desc,
-                &simp_desc.read2_desc,
-            );
-            info!("salmon description of simplified geometry {:?}", &sd);
-            */
-
-            seq_geom_xform::xform_read_pairs_to_file(
-                geo_re, args.read1, args.read2, args.out1, args.out2,
+            let xform_stats = seq_geom_xform::xform_read_pairs_to_file(
+                geo_re,
+                &args.read1,
+                &args.read2,
+                args.out1,
+                args.out2,
             )?;
+
+            info!("fragment transformation statistics\n{}", &xform_stats);
+            let total = xform_stats.total_fragments;
+            let failed = xform_stats.failed_parsing;
+            info!(
+                "Observed {} input fragments. {} ({:.2}%) of them failed to parse and were not transformed",
+                total, failed, if total > 0 { (failed as f64) / (total as f64) } else { 0_f64 } * 100_f64
+            );
+
+            let duration = start.elapsed();
+            info!("tranformation completed in {:.2}s", duration.as_secs_f32());
             Ok(())
         }
         Err(e) => Err(e),
