@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/COMBINE-lab/seq_geom_xform/compare/v0.2.0...v0.3.0) (2023-03-19)
+
+
+### Features
+
+* implement Display for XformStats ([e398eff](https://github.com/COMBINE-lab/seq_geom_xform/commit/e398effa2c6263b9b074aa26eacb342963a0126f))
+
 ## [0.2.0](https://github.com/COMBINE-lab/seq_geom_xform/compare/v0.1.2...v0.2.0) (2023-03-09)
 
 
