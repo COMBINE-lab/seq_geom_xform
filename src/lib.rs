@@ -86,7 +86,7 @@ fn parse_single_read(
 ) -> bool {
     // process each capture group:
     // we start at 1 here because the first group is always the match of the whole string
-    // and doesn't correspond to any *explicit* capture.  That is, if we explicilty 
+    // and doesn't correspond to any *explicit* capture.  That is, if we explicilty
     // asked to capture the whole string, then there will still be 2 capture groups
     // (and they will be identical).  So, here, we want to skip the "trivial"
     // match of the whole string, and iterate over the remaining capture locations.
