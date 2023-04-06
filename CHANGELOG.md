@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/COMBINE-lab/seq_geom_xform/compare/v0.3.0...v0.4.0) (2023-04-06)
+
+
+### Features
+
+* allow parsing of expanded geometries ([8cc8339](https://github.com/COMBINE-lab/seq_geom_xform/commit/8cc83391e267361b16843123b6af76d7d952c339))
+
 ## [0.3.0](https://github.com/COMBINE-lab/seq_geom_xform/compare/v0.2.0...v0.3.0) (2023-03-19)
 
 
