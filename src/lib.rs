@@ -84,34 +84,32 @@ fn parse_single_read(
     r: &str,
     outstr: &mut String,
 ) -> bool {
-    // if we expected to capture the whole thing
-    if gpieces.len() == 1 {
-        // then just copy it over into our string
-        outstr.push_str(r);
-    } else {
-        // otherwise, process each capture group
+    // process each capture group:
+    // we start at 1 here because the first group is always the match of the whole string
+    // and doesn't correspond to any *explicit* capture.  That is, if we explicilty 
+    // asked to capture the whole string, then there will still be 2 capture groups
+    // (and they will be identical).  So, here, we want to skip the "trivial"
+    // match of the whole string, and iterate over the remaining capture locations.
+    for cl in 1..clocs.len() {
+        if let Some(g) = clocs.get(cl) {
+            outstr.push_str(r.get(g.0..g.1).unwrap());
 
-        for cl in 1..clocs.len() {
-            if let Some(g) = clocs.get(cl) {
-                outstr.push_str(r.get(g.0..g.1).unwrap());
-
-                match gpieces.get(cl - 1) {
-                    // if we captured some variable length piece of geometry
-                    // then we have to apply the appropriate padding so that
-                    // we can pass the result to a non-variable length parser.
-                    Some(GeomPiece::Barcode(GeomLen::LenRange(_l, h)))
-                    | Some(GeomPiece::Umi(GeomLen::LenRange(_l, h)))
-                    | Some(GeomPiece::ReadSeq(GeomLen::LenRange(_l, h))) => {
-                        let captured_len = g.1 - g.0;
-                        outstr.push_str(VAR_LEN_BC_PADDING[(*h as usize) - (captured_len)]);
-                    }
-                    _ => {
-                        // fixed length, do nothing
-                    }
+            match gpieces.get(cl - 1) {
+                // if we captured some variable length piece of geometry
+                // then we have to apply the appropriate padding so that
+                // we can pass the result to a non-variable length parser.
+                Some(GeomPiece::Barcode(GeomLen::LenRange(_l, h)))
+                | Some(GeomPiece::Umi(GeomLen::LenRange(_l, h)))
+                | Some(GeomPiece::ReadSeq(GeomLen::LenRange(_l, h))) => {
+                    let captured_len = g.1 - g.0;
+                    outstr.push_str(VAR_LEN_BC_PADDING[(*h as usize) - (captured_len)]);
                 }
-            } else {
-                return false;
+                _ => {
+                    // fixed length, do nothing
+                }
             }
+        } else {
+            return false;
         }
     }
     true
